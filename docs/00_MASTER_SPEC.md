@@ -723,9 +723,16 @@ Sau Master Specification, tài liệu sẽ được triển khai theo thứ tự
         |
         v
 12_TESTING_SPEC.md
+        |
+        v
+13_SYSTEM_PROMPTS.md
 ```
 
 Mỗi tầng phải kế thừa các ràng buộc của `00_MASTER_SPEC.md` và đối chiếu ngược với `ai-debate-master-blueprint-v3.pdf`.
+
+> **Extension Proposals (ngoài Blueprint):**
+>
+> Tài liệu `14_SCHOOL_NETWORK_SPEC.md` không thuộc luồng đặc tả Blueprint-compliant ở trên. Đây là một **EXTENSION PROPOSAL** về lớp cộng đồng liên trường (School / Team / League / Tournament / Sponsor / Seat) không có trong Blueprint v3.0.0. Mọi nội dung trong file đó là `SPEC GAP` cho đến khi có một bản sửa đổi Blueprint chính thức (ví dụ v3.1.0). File mở rộng này **không sửa đổi** các file `02`–`12` và `13`.
 
 ---
 
