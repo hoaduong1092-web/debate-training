@@ -1,0 +1,273 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 1. Strict One-Account User Model
+model User {
+  id           String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  phoneNumber  String             @unique @map("phone_number") @db.VarChar(20)
+  displayName  String             @map("display_name") @db.VarChar(100)
+  avatarUrl    String?            @map("avatar_url") @db.VarChar(255)
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  subscription  UserSubscription?
+  quota         UserQuota?
+  sessions      DebateSession[]
+  voiceSessions VoiceSession[]
+  creditPacks   UserCreditPack[]
+  vipPasses     UserVipPass[]
+  freeTrial     UserFreeTrial?
+  orders        PaymentOrder[]
+  likes         DebateSessionLike[]
+  favorites     DebateSessionFavorite[]
+
+  @@map("users")
+}
+
+// 2. Dynamic Subscription Plans Registry
+model SubscriptionPlan {
+  id              String             @id @db.VarChar(50)
+  name            String             @db.VarChar(100)
+  billingCycle    String             @default("monthly") @map("billing_cycle") @db.VarChar(20)
+  priceVnd        Decimal            @map("price_vnd") @db.Decimal(10, 2)
+  durationDays    Int                @default(30) @map("duration_days")
+  textTurnsQuota  Int                @map("text_turns_quota")
+  voiceMinsQuota  Int                @map("voice_mins_quota")
+  assistantQuota  Int                @map("assistant_quota")
+  features        Json?              @map("features")
+  isPopular       Boolean            @default(false) @map("is_popular")
+  sortOrder       Int                @default(0) @map("sort_order")
+  isActive        Boolean            @default(true) @map("is_active")
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz()
+
+  subscriptions   UserSubscription[]
+  orders          PaymentOrder[]
+
+  @@map("subscription_plans")
+}
+
+// 3. User Subscriptions Lifecycle
+model UserSubscription {
+  id        String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String           @unique @map("user_id") @db.Uuid
+  planId    String           @map("plan_id") @db.VarChar(50)
+  status    String           @default("ACTIVE") @db.VarChar(20)
+  startedAt DateTime         @default(now()) @map("started_at") @db.Timestamptz()
+  expiresAt DateTime         @map("expires_at") @db.Timestamptz()
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan      SubscriptionPlan @relation(fields: [planId], references: [id])
+
+  @@map("user_subscriptions")
+}
+
+// 4. Real-time User Quotas (Atomic Consumption)
+model UserQuota {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String   @unique @map("user_id") @db.Uuid
+  textTurnsRemaining Int      @default(20) @map("text_turns_remaining")
+  voiceMinsRemaining Int      @default(15) @map("voice_mins_remaining")
+  assistantRemaining Int      @default(10) @map("assistant_remaining")
+  lastResetAt        DateTime @default(now()) @map("last_reset_at") @db.Timestamptz()
+
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_quotas")
+}
+
+// 5. Sparring Debate Sessions
+model DebateSession {
+  id          String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String                  @map("user_id") @db.Uuid
+  characterId String                  @map("character_id") @db.VarChar(50)
+  topic       String                  @db.Text
+  userSide    String                  @map("user_side") @db.VarChar(15)
+  inputMode   String                  @default("text") @map("input_mode") @db.VarChar(15)
+  status      String                  @default("IN_PROGRESS") @db.VarChar(20)
+  scoreTotal  Decimal                 @default(0.00) @map("score_total") @db.Decimal(4, 2)
+  viewCount   Int                     @default(0) @map("view_count")
+  createdAt   DateTime                @default(now()) @map("created_at") @db.Timestamptz()
+
+  user          User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transcripts   DebateTranscript[]
+  voiceSessions VoiceSession[]
+  likes         DebateSessionLike[]
+  favorites     DebateSessionFavorite[]
+
+  @@map("debate_sessions")
+}
+
+// 6. Turn-by-Turn Debate Transcripts
+model DebateTranscript {
+  id                String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId         String        @map("session_id") @db.Uuid
+  speakerType       String        @map("speaker_type") @db.VarChar(15)
+  turnNumber        Int           @map("turn_number")
+  textContent       String        @map("text_content") @db.Text
+  audioPath         String?       @map("audio_path") @db.VarChar(255)
+  fallaciesDetected Json?         @map("fallacies_detected")
+  evidenceStar      Int           @default(1) @map("evidence_star")
+  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+
+  session           DebateSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("debate_transcripts")
+}
+
+// 7. Payment Orders Lifecycle (Strict Idempotency & Persistence)
+model PaymentOrder {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String           @map("user_id") @db.Uuid
+  orderCode      String           @unique @map("order_code") @db.VarChar(100)
+  planId         String           @map("plan_id") @db.VarChar(50)
+  provider       String           @map("provider") @db.VarChar(20) // VNPAY, MOMO, SEPAY, SANDBOX
+  amountVnd      Decimal          @map("amount_vnd") @db.Decimal(10, 2)
+  status         String           @default("PENDING") @db.VarChar(20) // PENDING, PAID, FAILED, EXPIRED
+  transactionId  String?          @map("transaction_id") @db.VarChar(100)
+  rawWebhookData Json?            @map("raw_webhook_data")
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan           SubscriptionPlan @relation(fields: [planId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([provider, transactionId])
+  @@map("payment_orders")
+}
+
+// 8. Plaza Debate Session Likes (Unique atomic engagement)
+model DebateSessionLike {
+  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId String        @map("session_id") @db.Uuid
+  userId    String        @map("user_id") @db.Uuid
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+
+  session   DebateSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId])
+  @@index([sessionId])
+  @@index([userId])
+  @@map("debate_session_likes")
+}
+
+// 9. Plaza Debate Session Favorites (User-specific bookmarks)
+model DebateSessionFavorite {
+  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId String        @map("session_id") @db.Uuid
+  userId    String        @map("user_id") @db.Uuid
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+
+  session   DebateSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId])
+  @@index([sessionId])
+  @@index([userId])
+  @@map("debate_session_favorites")
+}
+
+// 10. Voice AI Session Lifecycle & Consumption Authority
+model VoiceSession {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String    @map("user_id") @db.Uuid
+  debateSessionId    String?   @map("debate_session_id") @db.Uuid
+
+  status             String    @default("CREATED") @db.VarChar(20) // CREATED, ACTIVE, FINALIZING, COMPLETED, ABORTED, TIMEOUT, FAILED
+
+  startedAt          DateTime  @default(now()) @map("started_at") @db.Timestamptz()
+  endedAt            DateTime? @map("ended_at") @db.Timestamptz()
+
+  maxAllowedMs       Int       @default(900000) @map("max_allowed_ms")
+  actualDurationMs   Int       @default(0) @map("actual_duration_ms")
+
+  billableMinutes    Int       @default(0) @map("billable_minutes")
+
+  consumedSubMins    Int       @default(0) @map("consumed_sub_mins")
+  consumedAddonMins  Int       @default(0) @map("consumed_addon_mins")
+
+  consumptionDetails Json?     @map("consumption_details")
+
+  isFinalized        Boolean   @default(false) @map("is_finalized")
+  finalizedAt        DateTime? @map("finalized_at") @db.Timestamptz()
+
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  debateSession      DebateSession? @relation(fields: [debateSessionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([startedAt])
+  @@map("voice_sessions")
+}
+
+// 11. Add-on Credit Packs with FEFO Expiry
+model UserCreditPack {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+
+  packCode       String    @map("pack_code") @db.VarChar(50)
+  dimension      String    @db.VarChar(20) // voice, text, assistant
+
+  totalUnits     Int       @map("total_units")
+  remainingUnits Int       @map("remaining_units")
+
+  status         String    @default("ACTIVE") @db.VarChar(20) // ACTIVE, DEPLETED, EXPIRED
+
+  purchasedAt    DateTime  @default(now()) @map("purchased_at") @db.Timestamptz()
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz()
+
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, dimension, status, expiresAt])
+  @@map("user_credit_packs")
+}
+
+// 12. VIP Time-Based Unlimited Entitlements
+model UserVipPass {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+
+  passCode  String    @map("pass_code") @db.VarChar(50)
+
+  status    String    @default("ACTIVE") @db.VarChar(20) // ACTIVE, EXPIRED, CANCELLED
+
+  startedAt DateTime  @default(now()) @map("started_at") @db.Timestamptz()
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz()
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, expiresAt])
+  @@map("user_vip_passes")
+}
+
+// 13. Free Trial Anti-Abuse Tracking
+model UserFreeTrial {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  userId              String    @unique @map("user_id") @db.Uuid
+  phoneNumber         String    @unique @map("phone_number") @db.VarChar(20)
+
+  status              String    @default("ACTIVE") @db.VarChar(20) // ACTIVE, EXPIRED, COMPLETED
+
+  textRemaining       Int       @default(3) @map("text_remaining")
+  voiceMinsRemaining  Int       @default(5) @map("voice_mins_remaining")
+  assistantRemaining Int       @default(1) @map("assistant_remaining")
+
+  startedAt           DateTime  @default(now()) @map("started_at") @db.Timestamptz()
+  expiresAt           DateTime  @map("expires_at") @db.Timestamptz()
+
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_free_trials")
+}
+
+

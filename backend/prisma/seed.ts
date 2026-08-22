@@ -1,0 +1,272 @@
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+async function main() {
+  console.log('[SEED] Seeding V14/V15 Dual-Cycle Subscription Plans (Monthly / 365-Day Yearly)...');
+
+  const plans = [
+    {
+      id: 'BASIC_MONTHLY',
+      name: 'Cơ Bản (Khám Phá)',
+      billingCycle: 'monthly',
+      priceVnd: 49000.0,
+      durationDays: 30,
+      textTurnsQuota: 30,
+      voiceMinsQuota: 15,
+      assistantQuota: 10,
+      isPopular: false,
+      sortOrder: 1,
+      isActive: true,
+      features: [
+        '30 lượt tranh biện văn bản',
+        '15 phút luyện nói Voice AI',
+        '10 câu hỏi Trợ lý phân tích',
+        'Logic Coach C-R-E cơ bản',
+      ],
+    },
+    {
+      id: 'BASIC_YEARLY',
+      name: 'Cơ Bản (Khám Phá)',
+      billingCycle: 'yearly',
+      priceVnd: 490000.0,
+      durationDays: 365,
+      textTurnsQuota: 360,
+      voiceMinsQuota: 180,
+      assistantQuota: 120,
+      isPopular: false,
+      sortOrder: 2,
+      isActive: true,
+      features: [
+        'Hạn mức 365 ngày trọn gói',
+        '360 lượt tranh biện văn bản',
+        '180 phút luyện nói Voice AI',
+        '120 câu hỏi Trợ lý',
+        'Tiết kiệm ~17%',
+      ],
+    },
+    {
+      id: 'STANDARD_MONTHLY',
+      name: 'Tiêu Chuẩn (Rèn Luyện)',
+      billingCycle: 'monthly',
+      priceVnd: 129000.0,
+      durationDays: 30,
+      textTurnsQuota: 100,
+      voiceMinsQuota: 60,
+      assistantQuota: 50,
+      isPopular: true,
+      sortOrder: 3,
+      isActive: true,
+      features: [
+        '100 lượt tranh biện văn bản',
+        '60 phút luyện nói Voice AI',
+        '50 câu hỏi Trợ lý phân tích',
+        'Mở rộng 4 AI Coaches (Logic, Voice, Interaction, Psychology)',
+        'Luyện tập phản biện đa lượt',
+      ],
+    },
+    {
+      id: 'STANDARD_YEARLY',
+      name: 'Tiêu Chuẩn (Rèn Luyện)',
+      billingCycle: 'yearly',
+      priceVnd: 1190000.0,
+      durationDays: 365,
+      textTurnsQuota: 1200,
+      voiceMinsQuota: 720,
+      assistantQuota: 600,
+      isPopular: true,
+      sortOrder: 4,
+      isActive: true,
+      features: [
+        'Hạn mức 365 ngày trọn gói',
+        '1.200 lượt tranh biện văn bản',
+        '720 phút (12 giờ) Voice AI',
+        '600 câu hỏi Trợ lý',
+        'Mở rộng 4 AI Coaches',
+        'Tiết kiệm ~23%',
+      ],
+    },
+    {
+      id: 'PREMIUM_MONTHLY',
+      name: 'Cao Cấp (Bứt Phá)',
+      billingCycle: 'monthly',
+      priceVnd: 399000.0,
+      durationDays: 30,
+      textTurnsQuota: 500,
+      voiceMinsQuota: 300,
+      assistantQuota: 200,
+      isPopular: false,
+      sortOrder: 5,
+      isActive: true,
+      features: [
+        '500 lượt tranh biện văn bản',
+        '300 phút luyện nói Voice AI',
+        '200 câu hỏi Trợ lý',
+        'Đầy đủ tính năng chuyên sâu',
+        'Ưu tiên Realtime AI Streaming',
+      ],
+    },
+    {
+      id: 'PREMIUM_YEARLY',
+      name: 'Cao Cấp (Bứt Phá)',
+      billingCycle: 'yearly',
+      priceVnd: 3590000.0,
+      durationDays: 365,
+      textTurnsQuota: 6000,
+      voiceMinsQuota: 3600,
+      assistantQuota: 2400,
+      isPopular: false,
+      sortOrder: 6,
+      isActive: true,
+      features: [
+        'Hạn mức 365 ngày trọn gói',
+        '6.000 lượt tranh biện văn bản',
+        '3.600 phút (60 giờ) Voice AI',
+        '2.400 câu hỏi Trợ lý',
+        'Đầy đủ tính năng cao cấp',
+        'Ưu tiên Realtime AI Streaming',
+        'Tiết kiệm 25%',
+      ],
+    },
+    // Add-on Credit Packs (Phase B7)
+    {
+      id: 'PACK_VOICE_15',
+      name: 'Voice Boost 15',
+      billingCycle: 'pack',
+      priceVnd: 15000.0,
+      durationDays: 30,
+      textTurnsQuota: 0,
+      voiceMinsQuota: 15,
+      assistantQuota: 0,
+      isPopular: false,
+      sortOrder: 101,
+      isActive: true,
+      features: ['+15 phút Voice AI (30 ngày)'],
+    },
+    {
+      id: 'PACK_VOICE_60',
+      name: 'Voice Boost 60',
+      billingCycle: 'pack',
+      priceVnd: 49000.0,
+      durationDays: 30,
+      textTurnsQuota: 0,
+      voiceMinsQuota: 60,
+      assistantQuota: 0,
+      isPopular: true,
+      sortOrder: 102,
+      isActive: true,
+      features: ['+60 phút Voice AI (30 ngày)'],
+    },
+    {
+      id: 'PACK_TEXT_10',
+      name: 'Text Boost 10',
+      billingCycle: 'pack',
+      priceVnd: 19000.0,
+      durationDays: 30,
+      textTurnsQuota: 10,
+      voiceMinsQuota: 0,
+      assistantQuota: 0,
+      isPopular: false,
+      sortOrder: 103,
+      isActive: true,
+      features: ['+10 phiên Text Debate (30 ngày)'],
+    },
+    {
+      id: 'PACK_ASST_5',
+      name: 'Assistant Boost 5',
+      billingCycle: 'pack',
+      priceVnd: 15000.0,
+      durationDays: 30,
+      textTurnsQuota: 0,
+      voiceMinsQuota: 0,
+      assistantQuota: 5,
+      isPopular: false,
+      sortOrder: 104,
+      isActive: true,
+      features: ['+5 lượt tạo Bản thảo / Báo cáo kiến nghị (30 ngày)'],
+    },
+    // VIP Time Passes (Phase C1)
+    {
+      id: 'VIP_1D',
+      name: 'VIP Pass 1 Ngày',
+      billingCycle: 'vip',
+      priceVnd: 19000.0,
+      durationDays: 1,
+      textTurnsQuota: 9999,
+      voiceMinsQuota: 9999,
+      assistantQuota: 9999,
+      isPopular: false,
+      sortOrder: 201,
+      isActive: true,
+      features: ['Không giới hạn quota trong 24 giờ'],
+    },
+    {
+      id: 'VIP_3D',
+      name: 'VIP Pass 3 Ngày (Chiến Dịch)',
+      billingCycle: 'vip',
+      priceVnd: 49000.0,
+      durationDays: 3,
+      textTurnsQuota: 9999,
+      voiceMinsQuota: 9999,
+      assistantQuota: 9999,
+      isPopular: true,
+      sortOrder: 202,
+      isActive: true,
+      features: ['Không giới hạn quota trong 72 giờ (Hero Campaign)'],
+    },
+    {
+      id: 'VIP_7D',
+      name: 'VIP Pass 7 Ngày',
+      billingCycle: 'vip',
+      priceVnd: 89000.0,
+      durationDays: 7,
+      textTurnsQuota: 9999,
+      voiceMinsQuota: 9999,
+      assistantQuota: 9999,
+      isPopular: false,
+      sortOrder: 203,
+      isActive: true,
+      features: ['Không giới hạn quota trong 7 ngày'],
+    },
+    {
+      id: 'VIP_30D',
+      name: 'VIP Pass 30 Ngày',
+      billingCycle: 'vip',
+      priceVnd: 199000.0,
+      durationDays: 30,
+      textTurnsQuota: 9999,
+      voiceMinsQuota: 9999,
+      assistantQuota: 9999,
+      isPopular: false,
+      sortOrder: 204,
+      isActive: true,
+      features: ['Không giới hạn quota trong 30 ngày'],
+    },
+  ];
+
+  // Clean up obsolete plan codes
+  await prisma.subscriptionPlan.deleteMany({
+    where: {
+      id: { notIn: plans.map((p) => p.id) },
+    },
+  });
+
+  for (const plan of plans) {
+    await prisma.subscriptionPlan.upsert({
+      where: { id: plan.id },
+      update: plan,
+      create: plan,
+    });
+  }
+
+  console.log('[SEED] Successfully seeded 6 Dual-Cycle Subscription Plans.');
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
