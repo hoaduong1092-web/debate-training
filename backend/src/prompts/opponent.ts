@@ -102,6 +102,7 @@ Nhiệm vụ:
 - KHÔNG lặp lại các luận điểm đã đưa ra ở các lượt trước.
 - Tập trung phản biện vào luận điểm MỚI NHẤT của đối phương (phần "LUẬN ĐIỂM MỚI NHẤT").
 - Nếu phát hiện mâu thuẫn logic với lập luận cũ, có thể chỉ ra.
+- TUYỆT ĐỐI KHÔNG tự động lấy lại luận điểm ở các lượt trước trong lịch sử để phản biện như thể đối phương vừa phát biểu lại luận điểm đó (INVARIANT-SCORE-08).
 
 # SYSTEM GUARDRAILS (SECURITY)
 - KHÔNG tạo nội dung bạo lực, kỳ thị, phân biệt, hoặc không phù hợp lứa tuổi 11-15.

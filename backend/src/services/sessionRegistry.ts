@@ -17,14 +17,23 @@ export class SessionRegistry {
    * Đăng ký hoặc ghi đè phiên hoạt động cho User trong Redis.
    * Nếu có phiên cũ, trả về sessionId cũ để kích hoạt Gentle Eviction.
    */
-  static async registerSession(userId: string, sessionId: string): Promise<string | null> {
+  static async registerSession(userId: string, sessionId: string): Promise<ActiveSession | null> {
     const key = redisKeys.activeSession(userId);
     const oldSessionId = await redisClient.get(key);
     
     // Set active session in Redis with 30d expiry to match token
     await redisClient.set(key, sessionId, 'EX', 30 * 24 * 60 * 60);
 
-    return oldSessionId && oldSessionId !== sessionId ? oldSessionId : null;
+    if (oldSessionId && oldSessionId !== sessionId) {
+      const socket = this.localSockets.get(oldSessionId);
+      return {
+        userId,
+        sessionId: oldSessionId,
+        socket: socket || null,
+        updatedAt: Date.now(),
+      };
+    }
+    return null;
   }
 
   /**
@@ -81,8 +90,15 @@ export class SessionRegistry {
   /**
    * Reset registry (dùng cho unit test)
    */
-  static async clear(userId: string): Promise<void> {
-    const key = redisKeys.activeSession(userId);
-    await redisClient.del(key);
+  static async clear(userId?: string): Promise<void> {
+    if (userId) {
+      const key = redisKeys.activeSession(userId);
+      await redisClient.del(key);
+    } else {
+      if (typeof (redisClient as any).flushall === 'function') {
+        await (redisClient as any).flushall();
+      }
+      this.localSockets.clear();
+    }
   }
 }

@@ -68,21 +68,21 @@ export async function runSessionEvictionTests(): Promise<boolean> {
   // ── TC-SESS-01: Single Active Session Registration ─────────────────────────
   section('TC-SESS-01: Register & Query Active Session');
   {
-    SessionRegistry.clear();
-    const old1 = SessionRegistry.registerSession(userId, sessionA);
+    await SessionRegistry.clear();
+    const old1 = await SessionRegistry.registerSession(userId, sessionA);
     assert('First session registration returns null oldSession', old1 === null);
-    assert('Session A is active', SessionRegistry.isActiveSession(userId, sessionA) === true);
-    assert('Active session ID matches Session A', SessionRegistry.getActiveSessionId(userId) === sessionA);
+    assert('Session A is active', (await SessionRegistry.isActiveSession(userId, sessionA)) === true);
+    assert('Active session ID matches Session A', (await SessionRegistry.getActiveSessionId(userId)) === sessionA);
   }
 
   // ── TC-SESS-02: Gentle Eviction on Second Device Login ──────────────────────
   section('TC-SESS-02: Gentle Eviction on Second Device Login');
   {
-    const old2 = SessionRegistry.registerSession(userId, sessionB);
+    const old2 = await SessionRegistry.registerSession(userId, sessionB);
     assert('Second session registration returns oldSession with session A', old2 !== null && old2.sessionId === sessionA);
-    assert('Session A is no longer active', SessionRegistry.isActiveSession(userId, sessionA) === false);
-    assert('Session B is now active', SessionRegistry.isActiveSession(userId, sessionB) === true);
-    assert('Active session ID matches Session B', SessionRegistry.getActiveSessionId(userId) === sessionB);
+    assert('Session A is no longer active', (await SessionRegistry.isActiveSession(userId, sessionA)) === false);
+    assert('Session B is now active', (await SessionRegistry.isActiveSession(userId, sessionB)) === true);
+    assert('Active session ID matches Session B', (await SessionRegistry.getActiveSessionId(userId)) === sessionB);
   }
 
   // ── TC-SESS-03: WebSocket Notification Dispatch ────────────────────────────
@@ -102,6 +102,8 @@ export async function runSessionEvictionTests(): Promise<boolean> {
         closedWithReason = reason;
       },
     } as unknown as WebSocket;
+
+    SessionRegistry.bindSocket(sessionA, mockSocket);
 
     const oldSessionWithSocket = {
       userId,
@@ -129,8 +131,8 @@ export async function runSessionEvictionTests(): Promise<boolean> {
   // ── TC-SESS-04: API Middleware Revocation Check ────────────────────────────
   section('TC-SESS-04: API Middleware Blocks Revoked Session Token');
   {
-    SessionRegistry.clear();
-    SessionRegistry.registerSession(userId, sessionB); // Only Session B is active
+    await SessionRegistry.clear();
+    await SessionRegistry.registerSession(userId, sessionB); // Only Session B is active
 
     const tokenA = jwt.sign({ userId, phoneNumber: '+84901111222', sessionId: sessionA }, JWT_SECRET);
 
@@ -170,8 +172,8 @@ export async function runSessionEvictionTests(): Promise<boolean> {
   // ── TC-SESS-06: Session Removal on Logout ──────────────────────────────────
   section('TC-SESS-06: Session Removal on Logout');
   {
-    SessionRegistry.removeSession(userId, sessionB);
-    assert('Session ID is null after removal', SessionRegistry.getActiveSessionId(userId) === null);
+    await SessionRegistry.removeSession(userId, sessionB);
+    assert('Session ID is null after removal', (await SessionRegistry.getActiveSessionId(userId)) === null);
   }
 
   console.log('\n────────────────────────────────────────────────────────────');

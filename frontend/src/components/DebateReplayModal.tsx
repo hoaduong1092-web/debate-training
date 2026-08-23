@@ -7,76 +7,7 @@ interface Props {
   onClose: () => void;
 }
 
-function getDynamicReplayCoach(roundNum: number) {
-  const claimsByTurn = [
-    'Xác lập lập trường và định vị khái niệm nền tảng của kiến nghị.',
-    'Phát triển cơ chế nhân quả và tính khả thi trong thực tiễn.',
-    'Phân tích chiều sâu tâm lý và sự tương tác giữa chủ thể giáo dục.',
-    'Đánh giá hiệu suất lao động và tác động của tự động hóa giáo án/chấm thi.',
-    'Chất vấn rủi ro đạo đức, thiên kiến thuật toán và trách nhiệm pháp lý.',
-    'So sánh tác động (Impact Comparison) giữa giá trị con người và tối ưu hóa máy móc.',
-    'Phân tích tính bền vững tâm lý học đường và thói quen phụ thuộc công nghệ.',
-    'Phản biện chuyên sâu về năng lực tư duy độc lập và tự học của học sinh.',
-    'Phân định ranh giới triết học giữa truyền đạt dữ liệu và giáo dục nhân cách.',
-    'Tổng hợp toàn diện các điểm xung đột cốt lõi (Clash Points) và chốt hạ điểm then chốt.',
-    'Củng cố đòn bẩy tranh biện và phân tích hệ quả thực nghiệm lâu dài.',
-    'Khóa chặt luận cứ đối phương và khẳng định tính tất yếu của lập trường.',
-  ];
 
-  const reasoningsByTurn = [
-    'Mạch logic trực diện, liên kết chặt chẽ giữa tiền đề và kết luận của kiến nghị.',
-    'Lập luận có tính liên kết nhân quả, chỉ ra được các bước vận hành của cơ chế.',
-    'Khai thác tốt khía cạnh tâm lý học đường, đưa ra các giả định có sức thuyết phục cao.',
-    'Cấu trúc lập luận so sánh đối chiếu rõ ràng giữa mô hình truyền thống và hiện đại.',
-    'Đi sâu vào phân tích rủi ro hệ thống, chỉ ra điểm nghẽn mà đối phương chưa giải quyết.',
-    'Phương pháp so sánh tác động mạch lạc, đặt trọng số vào hệ quả lâu dài của người học.',
-    'Phân tích đa chiều về hành vi con người, làm rõ tác động tiêu cực của tính phụ thuộc.',
-    'Lập luận phản biện sắc bén, bóc tách và phản hồi trực tiếp các phản biện của đối thủ.',
-    'Mạch tư duy triết học sâu sắc, nâng tầm cuộc tranh biện lên bình diện giá trị nhân văn.',
-    'Kết nối toàn bộ các luận cứ xuyên suốt các hiệp đấu, tạo thành hệ thống bảo vệ vững chắc.',
-    'Phân tích đối trọng tác động (Tipping Point Analysis), chứng minh lập trường vượt trội.',
-    'Tổng kết mạch suy luận logic không thể bẻ gãy, kết hợp chặt chẽ giữa lý luận và thực tiễn.',
-  ];
-
-  const evidencesByTurn = [
-    'Dẫn chứng định tính tốt, nên bổ sung số liệu khảo sát thực tế để tăng tính thuyết phục.',
-    'Dẫn chứng về quy trình làm việc thực tế, cần dẫn thêm báo cáo từ các tổ chức giáo dục.',
-    'Dẫn chứng tâm lý thuyết phục, nên bổ sung nghiên cứu thực nghiệm về trí tuệ cảm xúc.',
-    'Dẫn chứng thực tế về các công cụ AI hiện nay, cần so sánh thêm năng suất cụ thể.',
-    'Dẫn chứng về các sự cố AI thực tế, cần làm rõ mức độ phổ biến trong môi trường giáo dục.',
-    'Dẫn chứng so sánh tác động rõ ràng, nên bổ sung số liệu dài hạn về năng lực học sinh.',
-    'Dẫn chứng về tác động tâm lý screen-time và sự tương tác xã hội của học sinh.',
-    'Dẫn chứng thực nghiệm về kết quả học tập khi có sự can thiệp của gia sư AI.',
-    'Dẫn chứng so sánh lịch sử phát triển của các cuộc cách mạng công nghệ trong giáo dục.',
-    'Dẫn chứng tổng hợp bao quát toàn bộ các luận điểm đã nêu trong trận đấu.',
-    'Dẫn chứng thực tế từ các mô hình thí điểm công nghệ giáo dục trên thế giới.',
-    'Dẫn chứng đối chiếu toàn diện giữa chi phí đầu tư và giá trị nhân văn đạt được.',
-  ];
-
-  const suggestionsByTurn = [
-    ['Định nghĩa rõ phạm vi khái niệm ngay từ đầu', 'Tạo tiền đề vững chắc cho các lượt sau'],
-    ['Định lượng hóa các tác động cụ thể', 'Sử dụng ví dụ thực tế tại các trường học'],
-    ['Chất vấn sâu hơn vào ranh giới thấu cảm sinh học', 'Áp dụng phản biện ngược'],
-    ['Làm rõ sự khác biệt giữa "công cụ hỗ trợ" và "thay thế hoàn toàn"', 'Nêu rõ ranh giới trách nhiệm'],
-    ['Đưa ra các tình huống đạo đức tiến thoái lưỡng nan (Ethical Dilemma)', 'Phân tích trách nhiệm pháp lý'],
-    ['Sử dụng thang đo So sánh Tác động (Scale vs Severity)', 'Nhấn mạnh hậu quả không thể đảo ngược'],
-    ['Phân tích tâm lý lứa tuổi học sinh', 'Đưa ra giải pháp giảm thiểu rủi ro'],
-    ['Tổng hợp các điểm xung đột then chốt (Key Clashes)', 'Tấn công vào mắt xích yếu nhất của đối phương'],
-    ['Nâng cao giá trị biểu cảm và tính thuyết phục sư phạm', 'Đưa ra tầm nhìn dài hạn của nền giáo dục'],
-    ['Chốt hạ 3 lý do cốt lõi để Ban Giám Khảo bỏ phiếu cho phe mình', 'Tóm tắt sắc bén, dứt khoát'],
-    ['Nhấn mạnh tính bất khả thi của mô hình đối lập', 'Củng cố các giả định thực nghiệm'],
-    ['Đúc kết bài học đắt giá và khẳng định giá trị cốt lõi', 'Hoàn tất phần trình bày trọn vẹn'],
-  ];
-
-  const idx = Math.min(roundNum - 1, claimsByTurn.length - 1);
-  return {
-    score: +(7.5 + Math.min(2.4, roundNum * 0.25)).toFixed(1),
-    claim: `Luận điểm Lượt ${roundNum}: ${claimsByTurn[idx]}`,
-    reasoning: reasoningsByTurn[idx],
-    evidence: evidencesByTurn[idx],
-    suggestions: suggestionsByTurn[idx],
-  };
-}
 
 export const DebateReplayModal: React.FC<Props> = ({ sessionId, onClose }) => {
   const [data, setData] = useState<ReplaySessionDetails | null>(null);
@@ -191,26 +122,20 @@ export const DebateReplayModal: React.FC<Props> = ({ sessionId, onClose }) => {
         t.turnNumber === (currentUserTurn?.turnNumber ?? 0) + 1),
   ) || null;
 
-  const rawCoach = currentUserTurn?.coach_feedback || currentUserTurn?.coachFeedback;
-  const dynamicCoachFallback = getDynamicReplayCoach(selectedRound);
+  const rawCoach = currentUserTurn?.coach_feedback || currentUserTurn?.coachFeedback || null;
+  const coachScore = typeof rawCoach?.score === 'number' && Number.isFinite(rawCoach.score) ? rawCoach.score : null;
 
-  const coach = {
-    score: rawCoach?.score || dynamicCoachFallback.score,
+  const coach = rawCoach ? {
+    score: coachScore,
     cre_analysis: {
-      claim: rawCoach?.cre_analysis?.claim || dynamicCoachFallback.claim,
-      reasoning: rawCoach?.cre_analysis?.reasoning && !rawCoach.cre_analysis.reasoning.includes('Mạch liên kết logic chặt chẽ')
-        ? rawCoach.cre_analysis.reasoning
-        : dynamicCoachFallback.reasoning,
-      evidence: rawCoach?.cre_analysis?.evidence && !rawCoach.cre_analysis.evidence.includes('Cần bổ sung dẫn chứng từ các nghiên cứu')
-        ? rawCoach.cre_analysis.evidence
-        : dynamicCoachFallback.evidence,
+      claim: rawCoach?.cre_analysis?.claim || '',
+      reasoning: rawCoach?.cre_analysis?.reasoning || '',
+      evidence: rawCoach?.cre_analysis?.evidence || '',
     },
-    strengths: rawCoach?.strengths && rawCoach.strengths.length > 0 ? rawCoach.strengths : ['Lập luận chặt chẽ', `Bảo vệ tốt lập trường ở Lượt ${selectedRound}`],
-    weaknesses: rawCoach?.weaknesses && rawCoach.weaknesses.length > 0 ? rawCoach.weaknesses : ['Cần mở rộng phản biện đa chiều hơn'],
-    actionable_suggestions: rawCoach?.actionable_suggestions && rawCoach.actionable_suggestions.length > 0 && !rawCoach.actionable_suggestions[0]?.includes('So sánh Tác động (Impact Comparison)')
-      ? rawCoach.actionable_suggestions
-      : dynamicCoachFallback.suggestions,
-  };
+    strengths: rawCoach?.strengths || [],
+    weaknesses: rawCoach?.weaknesses || [],
+    actionable_suggestions: rawCoach?.actionable_suggestions || [],
+  } : null;
 
   const fallacies = currentUserTurn?.fallacies_detected || currentUserTurn?.fallacies || [];
   const voiceMetrics = currentUserTurn?.voice_metrics || currentUserTurn?.voiceMetrics || null;
@@ -232,18 +157,18 @@ export const DebateReplayModal: React.FC<Props> = ({ sessionId, onClose }) => {
   };
 
   const session = data?.session;
-  const overallScore = typeof session?.score_total === 'number' && session.score_total > 0
+  const overallScore = typeof session?.score_total === 'number' && Number.isFinite(session.score_total)
     ? session.score_total
-    : (coach?.score || 7.8);
-  const contentScore = typeof session?.score_content === 'number' && session.score_content > 0
+    : coachScore;
+  const contentScore = typeof session?.score_content === 'number' && Number.isFinite(session.score_content)
     ? session.score_content
-    : +(overallScore * 0.98).toFixed(1);
-  const styleScore = typeof session?.score_style === 'number' && session.score_style > 0
+    : null;
+  const styleScore = typeof session?.score_style === 'number' && Number.isFinite(session.score_style)
     ? session.score_style
-    : +(overallScore * 1.02).toFixed(1);
-  const strategyScore = typeof session?.score_strategy === 'number' && session.score_strategy > 0
+    : null;
+  const strategyScore = typeof session?.score_strategy === 'number' && Number.isFinite(session.score_strategy)
     ? session.score_strategy
-    : +(overallScore * 0.99).toFixed(1);
+    : null;
 
   return (
     <div
@@ -279,25 +204,39 @@ export const DebateReplayModal: React.FC<Props> = ({ sessionId, onClose }) => {
 
           {/* Overall Score Cluster */}
           <div className="flex items-center gap-2 md:gap-4 shrink-0">
-            <div className="hidden sm:flex items-center gap-2">
-              <div className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center">
-                <div className="text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400">Nội Dung</div>
-                <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400 font-mono">{contentScore}</div>
+            {(contentScore !== null || styleScore !== null || strategyScore !== null) && (
+              <div className="hidden sm:flex items-center gap-2">
+                {contentScore !== null && (
+                  <div className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center">
+                    <div className="text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400">Nội Dung</div>
+                    <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400 font-mono">{contentScore.toFixed(1)}</div>
+                  </div>
+                )}
+                {styleScore !== null && (
+                  <div className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center">
+                    <div className="text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400">Phong Cách</div>
+                    <div className="text-xs font-bold text-cyan-600 dark:text-cyan-400 font-mono">{styleScore.toFixed(1)}</div>
+                  </div>
+                )}
+                {strategyScore !== null && (
+                  <div className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center">
+                    <div className="text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400">Chiến Lược</div>
+                    <div className="text-xs font-bold text-teal-600 dark:text-teal-400 font-mono">{strategyScore.toFixed(1)}</div>
+                  </div>
+                )}
               </div>
-              <div className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center">
-                <div className="text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400">Phong Cách</div>
-                <div className="text-xs font-bold text-cyan-600 dark:text-cyan-400 font-mono">{styleScore}</div>
-              </div>
-              <div className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center">
-                <div className="text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400">Chiến Lược</div>
-                <div className="text-xs font-bold text-teal-600 dark:text-teal-400 font-mono">{strategyScore}</div>
-              </div>
-            </div>
+            )}
 
             <div className="px-3.5 py-1.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-500/30 text-center">
               <div className="text-[9px] uppercase font-bold text-indigo-600 dark:text-indigo-400">Điểm Tổng Thể</div>
               <div className="text-lg font-black text-indigo-700 dark:text-indigo-300 font-mono leading-none mt-0.5">
-                {overallScore.toFixed(1)} <span className="text-[10px] font-sans font-normal text-slate-500">/ 10</span>
+                {overallScore !== null ? (
+                  <>
+                    {overallScore.toFixed(1)} <span className="text-[10px] font-sans font-normal text-slate-500">/ 10</span>
+                  </>
+                ) : (
+                  <span className="text-xs font-sans font-normal text-slate-400">N/A</span>
+                )}
               </div>
             </div>
 
@@ -426,7 +365,7 @@ export const DebateReplayModal: React.FC<Props> = ({ sessionId, onClose }) => {
                       Logic Coach Diagnostic (Lượt {selectedRound})
                     </span>
                     <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-500/20">
-                      Điểm: {(coach?.score ?? 8.0).toFixed(1)} / 10
+                      Điểm: {coachScore !== null ? `${coachScore.toFixed(1)} / 10` : 'N/A'}
                     </span>
                   </div>
 
@@ -438,7 +377,7 @@ export const DebateReplayModal: React.FC<Props> = ({ sessionId, onClose }) => {
                         <span>🎯 Claim (Luận điểm)</span>
                       </div>
                       <div className="text-slate-800 dark:text-slate-200 leading-relaxed">
-                        {coach?.cre_analysis?.claim || 'Luận điểm rõ ràng, trực diện.'}
+                        {coach?.cre_analysis?.claim || (coach ? '(Không xác định được luận điểm rõ ràng)' : 'Chưa có dữ liệu')}
                       </div>
                     </div>
 
@@ -448,7 +387,7 @@ export const DebateReplayModal: React.FC<Props> = ({ sessionId, onClose }) => {
                         <span>🧠 Reasoning (Lập luận)</span>
                       </div>
                       <div className="text-slate-800 dark:text-slate-200 leading-relaxed">
-                        {coach?.cre_analysis?.reasoning || 'Lập luận chặt chẽ, mạch lạc.'}
+                        {coach?.cre_analysis?.reasoning || (coach ? '(Không có lý lẽ nào được trình bày)' : 'Chưa có dữ liệu')}
                       </div>
                     </div>
 
@@ -458,7 +397,7 @@ export const DebateReplayModal: React.FC<Props> = ({ sessionId, onClose }) => {
                         <span>📊 Evidence (Dẫn chứng)</span>
                       </div>
                       <div className="text-slate-800 dark:text-slate-200 leading-relaxed">
-                        {coach?.cre_analysis?.evidence || 'Cần bổ sung số liệu thực nghiệm.'}
+                        {coach?.cre_analysis?.evidence || (coach ? '(Không có dẫn chứng nào được cung cấp)' : 'Chưa có dữ liệu')}
                       </div>
                     </div>
                   </div>

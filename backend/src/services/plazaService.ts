@@ -51,9 +51,9 @@ export interface PlazaFeedItem {
   character_id: string;
   user_side: 'AFFIRMATIVE' | 'NEGATIVE';
   overall_score: number;
-  content_score: number;
-  style_score: number;
-  strategy_score: number;
+  content_score?: number | null;
+  style_score?: number | null;
+  strategy_score?: number | null;
   highlight_quote: string;
   turn_count: number;
   like_count: number;
@@ -74,9 +74,9 @@ export interface PlazaDetailPayload {
     character_id: string;
     user_side: 'AFFIRMATIVE' | 'NEGATIVE';
     overall_score: number;
-    content_score: number;
-    style_score: number;
-    strategy_score: number;
+    content_score?: number | null;
+    style_score?: number | null;
+    strategy_score?: number | null;
     like_count: number;
     view_count: number;
     is_liked: boolean;
@@ -387,9 +387,9 @@ export class PlazaService {
         character_id: s.characterId,
         user_side: s.userSide as 'AFFIRMATIVE' | 'NEGATIVE',
         overall_score: overallScore,
-        content_score: Math.min(100, Math.round(overallScore * 0.98)),
-        style_score: Math.min(100, Math.round(overallScore * 1.02)),
-        strategy_score: Math.min(100, Math.round(overallScore * 0.96)),
+        content_score: null,
+        style_score: null,
+        strategy_score: null,
         highlight_quote: highlight,
         turn_count: s._count.transcripts,
         like_count: s._count.likes,
@@ -482,9 +482,9 @@ export class PlazaService {
         character_id: session.characterId,
         user_side: session.userSide as 'AFFIRMATIVE' | 'NEGATIVE',
         overall_score: overallScore,
-        content_score: Math.min(100, Math.round(overallScore * 0.98)),
-        style_score: Math.min(100, Math.round(overallScore * 1.02)),
-        strategy_score: Math.min(100, Math.round(overallScore * 0.96)),
+        content_score: null,
+        style_score: null,
+        strategy_score: null,
         like_count: session._count.likes,
         view_count: session.viewCount,
         is_liked: Array.isArray(session.likes) && session.likes.length > 0,

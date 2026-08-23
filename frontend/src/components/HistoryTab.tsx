@@ -82,24 +82,21 @@ export const HistoryTab: React.FC<Props> = ({ onStartNewDebate, language = 'vi',
         });
 
         if (!isDuplicate) {
-          let score = s.score_total;
-          if (!score || score <= 0) {
+          let score: number | null = typeof s.score_total === 'number' && Number.isFinite(s.score_total) ? s.score_total : null;
+          if (score === null) {
             try {
               const replayRaw = localStorage.getItem(`local_debate_replay_${s.id}`);
               if (replayRaw) {
                 const parsedReplay = JSON.parse(replayRaw);
-                if (parsedReplay?.session?.score_total && parsedReplay.session.score_total > 0) {
+                if (typeof parsedReplay?.session?.score_total === 'number' && Number.isFinite(parsedReplay.session.score_total)) {
                   score = parsedReplay.session.score_total;
                 }
               }
             } catch {}
           }
-          if (!score || score <= 0) {
-            score = 7.8;
-          }
           mergedList.push({
             ...s,
-            score_total: score,
+            score_total: score !== null ? score : undefined,
           });
         }
       }
@@ -439,7 +436,8 @@ export const HistoryTab: React.FC<Props> = ({ onStartNewDebate, language = 'vi',
         <div className="grid grid-cols-1 gap-3.5">
           {filteredSessions.map((session) => {
             const isAffirmative = session.user_side === 'AFFIRMATIVE';
-            const scoreNum = typeof session.score_total === 'number' && session.score_total > 0 ? session.score_total : 7.8;
+            const isScoreAvailable = typeof session.score_total === 'number' && Number.isFinite(session.score_total);
+            const scoreNum: number | null = isScoreAvailable && session.score_total !== undefined ? session.score_total : null;
             const isVoiceMode = session.input_mode === 'voice';
             const isSelected = selectedIds.has(session.id);
 
@@ -514,7 +512,13 @@ export const HistoryTab: React.FC<Props> = ({ onStartNewDebate, language = 'vi',
                       {language === 'vi' ? 'Điểm Đánh Giá' : 'Overall Score'}
                     </div>
                     <div className="text-base font-black font-mono text-indigo-700 dark:text-indigo-400">
-                      {scoreNum.toFixed(1)} <span className="text-[10px] font-sans font-normal text-slate-500">/ 10</span>
+                      {scoreNum !== null ? (
+                        <>
+                          {scoreNum.toFixed(1)} <span className="text-[10px] font-sans font-normal text-slate-500">/ 10</span>
+                        </>
+                      ) : (
+                        <span className="text-xs font-sans font-normal text-slate-400">N/A</span>
+                      )}
                     </div>
                   </div>
 

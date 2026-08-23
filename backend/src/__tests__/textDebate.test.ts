@@ -47,7 +47,9 @@ function section(title: string): void {
 function isCoachFeedback(v: unknown): boolean {
   if (!v || typeof v !== 'object') return false;
   const o = v as Record<string, unknown>;
-  if (typeof o.score !== 'number') return false;
+  if (o.score !== null && (typeof o.score !== 'number' || !Number.isFinite(o.score) || o.score < 0 || o.score > 10)) {
+    return false;
+  }
   const cre = o.cre_analysis as Record<string, unknown> | null | undefined;
   if (!cre || typeof cre !== 'object') return false;
   return (
@@ -155,14 +157,15 @@ section('TC-TEXT-01b — Parser: All 8 Response Shape Variants');
   assert('[Shape 4] score string "6" -> number 6', r4.score === 6);
   assert('[Shape 4] evidence array -> string', typeof r4.cre_analysis.evidence === 'string');
 
-  // Shape 5: Empty string -> fallback, score not 0.
+  // Shape 5: Empty string -> fallback, score is null (PARSE_FAILED).
   const r5 = adaptLogicCoachPayload('');
   assert('[Shape 5] empty -> isCoachFeedback', isCoachFeedback(r5));
-  assert('[Shape 5] empty -> fallback score=4 (not 0)', r5.score === 4.0);
+  assert('[Shape 5] empty -> score is null (PARSE_FAILED)', r5.score === null && r5.score_source === 'PARSE_FAILED');
 
   // Shape 6: Fully malformed.
   const r6 = adaptLogicCoachPayload('{ score: nope, not json }}}}');
   assert('[Shape 6] malformed -> isCoachFeedback', isCoachFeedback(r6));
+  assert('[Shape 6] malformed -> score is null (PARSE_FAILED)', r6.score === null && r6.score_source === 'PARSE_FAILED');
 
   // Shape 7: Already-parsed object (controller pass-through).
   const r7 = adaptLogicCoachPayload(CRE_VALID as unknown);
@@ -195,7 +198,6 @@ section('TC-TEXT-01c — Truncated JSON Repair (max_tokens token-cap simulation)
 
   const adapted = adaptLogicCoachPayload(CRE_TRUNCATED);
   assert('truncated: adaptLogicCoachPayload -> isCoachFeedback', isCoachFeedback(adapted));
-  assert('truncated: score >= 1 (no 0-point regression)', adapted.score >= 1);
 }
 
 // ─── TC-TEXT-02: Topic Synchronisation ───────────────────────────────────────
@@ -286,12 +288,12 @@ section('TC-TEXT-04 — Quota Gate (business rule simulation, zero DB calls)');
   assert('quota error: message is string', typeof quotaErr.message === 'string');
 }
 
-// ─── TC-TEXT-05: Score Normalisation (0-point fix) ───────────────────────────
+// ─── TC-TEXT-05: Score Normalisation (Score Integrity Remediated) ───────────
 
-section('TC-TEXT-05 — Score Normalisation (0-point regression guard)');
+section('TC-TEXT-05 — Score Normalisation (Score Integrity Invariants)');
 
 {
-  // Missing score field -> inferred from CRE content richness.
+  // 1. Missing score field -> score is null, NO INFERENCE (INVARIANT-SCORE-03)
   const noScore = normalizeLogicCoachFeedback({
     cre_analysis: {
       claim: 'Dong phuc thuc day su binh dang.',
@@ -305,22 +307,52 @@ section('TC-TEXT-05 — Score Normalisation (0-point regression guard)');
   });
   assert('missing score -> normalized not null', noScore !== null);
   if (noScore !== null) {
-    assert('missing score -> inferred >= 5.0', noScore.score >= 5.0);
+    assert('missing score -> score is null (no fake inference)', noScore.score === null);
+    assert('missing score -> score_source is NO_SCORE', noScore.score_source === 'NO_SCORE');
     assert('missing score -> passes isCoachFeedback', isCoachFeedback(noScore));
   }
 
-  // Score on 0-100 percent scale: the normalizer fast-paths already-valid objects
-  // (isLogicCoachFeedback only checks Number.isFinite, not range). The key invariant
-  // is that adaptLogicCoachPayload always returns a valid CoachFeedback shape.
-  const percentScore = adaptLogicCoachPayload(JSON.stringify({ ...CRE_VALID, score: 85 }));
-  assert('score=85 -> adaptLogicCoachPayload returns isCoachFeedback', isCoachFeedback(percentScore));
-  assert('score=85 -> score is finite number', Number.isFinite(percentScore.score));
+  // 2. Explicit Score 0.0 -> preserved as 0.0, LLM_EVALUATED (INVARIANT-SCORE-02)
+  const zeroScore = normalizeLogicCoachFeedback({
+    score: 0,
+    cre_analysis: {
+      claim: 'Không xác định được luận điểm rõ ràng.',
+      reasoning: 'Không có lý lẽ nào được trình bày.',
+      evidence: 'Không có dẫn chứng nào được cung cấp.',
+    },
+    fallacies_detected: ['Phát biểu rỗng'],
+    strengths: [],
+    weaknesses: ['Chưa có nội dung'],
+    actionable_suggestions: ['Trình bày luận cứ'],
+  });
+  assert('score=0 -> normalized not null', zeroScore !== null);
+  if (zeroScore !== null) {
+    assert('score=0 -> score preserved as 0', zeroScore.score === 0);
+    assert('score=0 -> score_source is LLM_EVALUATED', zeroScore.score_source === 'LLM_EVALUATED');
+    assert('score=0 -> passes isCoachFeedback', isCoachFeedback(zeroScore));
+  }
 
-  // Negative score: fast-path preserves it for valid objects. The 0-point fix
-  // targets the FALLBACK path (parse failure), not pre-validated objects.
-  const negScore = adaptLogicCoachPayload(JSON.stringify({ ...CRE_VALID, score: -1 }));
-  assert('score=-1 -> adaptLogicCoachPayload returns isCoachFeedback', isCoachFeedback(negScore));
-  assert('score=-1 -> score is finite (not NaN)', Number.isFinite(negScore.score));
+  // 3. Score on 0-100 percent scale -> normalized to 0-10 (e.g. 85 -> 8.5)
+  const percentScore = normalizeLogicCoachFeedback({
+    ...CRE_VALID,
+    score: 85,
+  });
+  assert('score=85 -> normalized not null', percentScore !== null);
+  if (percentScore !== null) {
+    assert('score=85 -> normalized to 8.5', percentScore.score === 8.5);
+    assert('score=85 -> passes isCoachFeedback', isCoachFeedback(percentScore));
+  }
+
+  // 4. Out of range / negative score -> normalized to null (INVARIANT-SCORE-03)
+  const negScore = normalizeLogicCoachFeedback({
+    ...CRE_VALID,
+    score: -1,
+  });
+  assert('score=-1 -> normalized not null', negScore !== null);
+  if (negScore !== null) {
+    assert('score=-1 -> score normalized to null', negScore.score === null);
+    assert('score=-1 -> passes isCoachFeedback', isCoachFeedback(negScore));
+  }
 }
 
 // ─── TC-TEXT-06: Prompt Token Discipline ─────────────────────────────────────

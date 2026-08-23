@@ -91,7 +91,7 @@ export interface CreAnalysis {
 }
 
 export interface CoachFeedback {
-  score: number;
+  score: number | null;
   cre_analysis: CreAnalysis;
   fallacies_detected: string[];
   strengths: string[];
@@ -337,7 +337,7 @@ function isCoachFeedback(value: unknown): value is CoachFeedback {
     return false;
   }
   const v = value as Record<string, unknown>;
-  if (typeof v.score !== 'number') {
+  if (v.score !== null && (typeof v.score !== 'number' || !Number.isFinite(v.score) || v.score < 0 || v.score > 10)) {
     return false;
   }
   const cre = v.cre_analysis;
@@ -419,9 +419,9 @@ export interface HistorySessionSummary {
   user_side: DebateStance | string;
   input_mode?: 'text' | 'voice' | string;
   score_total?: number;
-  score_content?: number;
-  score_style?: number;
-  score_strategy?: number;
+  score_content?: number | null;
+  score_style?: number | null;
+  score_strategy?: number | null;
   turn_count: number;
   last_evidence_star?: number | null;
   created_at: string;
@@ -475,9 +475,9 @@ export interface ReplaySessionDetails {
     user_side: string;
     input_mode?: string;
     score_total?: number;
-    score_content?: number;
-    score_style?: number;
-    score_strategy?: number;
+    score_content?: number | null;
+    score_style?: number | null;
+    score_strategy?: number | null;
     max_turns: number;
     created_at: string;
   };
@@ -870,9 +870,9 @@ export interface PlazaItem {
   character_id: string;
   user_side: 'AFFIRMATIVE' | 'NEGATIVE';
   overall_score: number;
-  content_score: number;
-  style_score: number;
-  strategy_score: number;
+  content_score?: number | null;
+  style_score?: number | null;
+  strategy_score?: number | null;
   highlight_quote: string;
   turn_count: number;
   like_count: number;
@@ -929,9 +929,9 @@ export interface PlazaDetailSession {
   character_id: string;
   user_side: 'AFFIRMATIVE' | 'NEGATIVE';
   overall_score: number;
-  content_score: number;
-  style_score: number;
-  strategy_score: number;
+  content_score?: number | null;
+  style_score?: number | null;
+  strategy_score?: number | null;
   like_count: number;
   view_count: number;
   is_liked: boolean;

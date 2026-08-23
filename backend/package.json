@@ -31,6 +31,7 @@
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.1",
+    "@types/ioredis": "^4.28.10",
     "@types/node": "^24.0.0",
     "prisma": "^6.19.3",
     "tsx": "^4.20.0",

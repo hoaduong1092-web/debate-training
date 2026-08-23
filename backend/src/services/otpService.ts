@@ -97,12 +97,18 @@ export class OtpService {
     return { success: true, message: 'Xác thực OTP thành công.' };
   }
 
-  static async clearStore(phoneNumber: string): Promise<void> {
-    await redisClient.del(
-      redisKeys.otp(phoneNumber),
-      redisKeys.otpAttempts(phoneNumber),
-      redisKeys.otpCooldown(phoneNumber),
-      redisKeys.otpDaily(phoneNumber)
-    );
+  static async clearStore(phoneNumber?: string): Promise<void> {
+    if (phoneNumber) {
+      await redisClient.del(
+        redisKeys.otp(phoneNumber),
+        redisKeys.otpAttempts(phoneNumber),
+        redisKeys.otpCooldown(phoneNumber),
+        redisKeys.otpDaily(phoneNumber)
+      );
+    } else {
+      if (typeof (redisClient as any).flushall === 'function') {
+        await (redisClient as any).flushall();
+      }
+    }
   }
 }

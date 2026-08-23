@@ -41,8 +41,8 @@ export async function runFullE2ESuite(): Promise<boolean> {
   console.log('  COMPREHENSIVE BLUEPRINT v15.0.0 INTEGRATION TEST SUITE');
   console.log('============================================================\n');
 
-  SessionRegistry.clear();
-  OtpService.clearStore();
+  await SessionRegistry.clear();
+  await OtpService.clearStore();
 
   // ── HƯỚNG 1: QUOTA LOGIC ───────────────────────────────────────────────────
   section('TC-ALL-01 [HƯỚNG 1]: Quota deduction atomic rules verification');
@@ -67,10 +67,10 @@ export async function runFullE2ESuite(): Promise<boolean> {
     const phone = PhoneValidator.normalizeE164('0912345678');
     check('Phone normalizes to +84912345678', phone === '+84912345678');
 
-    const otpRes = OtpService.generateOtp(phone!);
+    const otpRes = await OtpService.generateOtp(phone!);
     check('Initial OTP request succeeds', otpRes.success === true);
 
-    const spamRes = OtpService.generateOtp(phone!);
+    const spamRes = await OtpService.generateOtp(phone!);
     check('Immediate spam request blocked (cooldown > 0)', spamRes.success === false && (spamRes.cooldownRemaining ?? 0) > 0);
   }
 
@@ -78,14 +78,14 @@ export async function runFullE2ESuite(): Promise<boolean> {
   section('TC-ALL-03 [HƯỚNG 3]: Single active session enforcement');
   {
     const userId = 'user-uuid-v15';
-    const oldSession = SessionRegistry.registerSession(userId, 'session-A');
+    const oldSession = await SessionRegistry.registerSession(userId, 'session-A');
     check('Session A registers as initial session', oldSession === null);
-    check('Session A is active', SessionRegistry.isActiveSession(userId, 'session-A') === true);
+    check('Session A is active', (await SessionRegistry.isActiveSession(userId, 'session-A')) === true);
 
-    const replaced = SessionRegistry.registerSession(userId, 'session-B');
+    const replaced = await SessionRegistry.registerSession(userId, 'session-B');
     check('Session B registration returns oldSession A', replaced !== null && replaced.sessionId === 'session-A');
-    check('Session A is now revoked', SessionRegistry.isActiveSession(userId, 'session-A') === false);
-    check('Session B is now active', SessionRegistry.isActiveSession(userId, 'session-B') === true);
+    check('Session A is now revoked', (await SessionRegistry.isActiveSession(userId, 'session-A')) === false);
+    check('Session B is now active', (await SessionRegistry.isActiveSession(userId, 'session-B')) === true);
   }
 
   // ── HƯỚNG 4: VOICE COACH DSP ENGINE ────────────────────────────────────────

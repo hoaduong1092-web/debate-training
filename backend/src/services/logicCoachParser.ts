@@ -21,12 +21,13 @@ export interface CreAnalysis {
 }
 
 export interface LogicCoachFeedback {
-  score: number;
+  score: number | null;
   cre_analysis: CreAnalysis;
   fallacies_detected: string[];
   strengths: string[];
   weaknesses: string[];
   actionable_suggestions: string[];
+  score_source?: 'LLM_EVALUATED' | 'NO_SCORE' | 'PARSE_FAILED';
 }
 
 export type ParseLogicCoachResult =
@@ -35,7 +36,7 @@ export type ParseLogicCoachResult =
 
 /**
  * Frontend contract (`frontend/src/lib/api.ts` `CoachFeedback` / `isCoachFeedback`):
- * - score: number
+ * - score: number | null
  * - cre_analysis: { claim: string; reasoning: string; evidence: string }
  * - fallacies_detected: string[]
  * - strengths: string[]
@@ -163,7 +164,12 @@ function isStringArray(value: unknown): value is string[] {
 export function isLogicCoachFeedback(value: unknown): value is LogicCoachFeedback {
   if (!value || typeof value !== 'object') return false;
   const v = value as Record<string, unknown>;
-  if (typeof v.score !== 'number' || !Number.isFinite(v.score)) return false;
+  if (
+    v.score !== null &&
+    (typeof v.score !== 'number' || !Number.isFinite(v.score) || v.score < 0 || v.score > 10)
+  ) {
+    return false;
+  }
 
   const cre = v.cre_analysis;
   if (!cre || typeof cre !== 'object') return false;
@@ -232,47 +238,28 @@ function toStringArray(value: unknown): string[] {
   return single ? [single] : [];
 }
 
-// ─── Score Inference (0-point fix) ───────────────────────────────────────────
-
-/**
- * Infer a reasonable score (5.0–7.5) from the presence and richness of
- * C-R-E content when the model omits or returns an invalid `score` field.
- *
- * Rationale: a 0.0 score on every parse failure is worse UX than a
- * mid-range inferred score.  The inference bands are conservative.
- *
- * Band logic:
- *   All three CRE fields present + 2+ suggestions → 6.5
- *   All three CRE fields present                  → 6.0
- *   Two of three CRE fields                       → 5.5
- *   Only one CRE field                            → 5.0
- *   Nothing                                       → 5.0 (generic mid)
- */
-function inferScoreFromContent(
-  claim: string,
-  reasoning: string,
-  evidence: string,
-  suggestions: string[],
-): number {
-  const present = [claim, reasoning, evidence].filter((s) => s.length > 10).length;
-  if (present === 3 && suggestions.length >= 2) return 6.5;
-  if (present === 3) return 6.0;
-  if (present === 2) return 5.5;
-  return 5.0;
-}
-
 // ─── Normalisation ────────────────────────────────────────────────────────────
 
 /**
  * Coerce common LLM / camelCase / partial shapes into the frontend CoachFeedback contract.
  * Also handles already-valid LogicCoachFeedback objects (pass-through).
  *
- * 0-point fix: when score is missing/invalid, we infer a reasonable value from
- * CRE content richness instead of returning null and triggering the 0-fallback.
+ * Strict Score Integrity (INVARIANT-SCORE-01, INVARIANT-SCORE-02, INVARIANT-SCORE-03):
+ * - Score 0.0 is explicitly VALID and PRESERVED.
+ * - Missing/null score is preserved as null (NO guessing or inferring from text length).
+ * - Wild values outside [0, 10] or 0-100 are clamped/normalized.
  */
 export function normalizeLogicCoachFeedback(value: unknown): LogicCoachFeedback | null {
   // Fast path: already a valid feedback object.
-  if (isLogicCoachFeedback(value)) return value;
+  if (isLogicCoachFeedback(value)) {
+    if (!value.score_source) {
+      return {
+        ...value,
+        score_source: typeof value.score === 'number' ? 'LLM_EVALUATED' : 'NO_SCORE',
+      };
+    }
+    return value;
+  }
 
   const root = asRecord(value);
   if (!root) return null;
@@ -306,18 +293,21 @@ export function normalizeLogicCoachFeedback(value: unknown): LogicCoachFeedback 
     ]),
   );
 
-  // ── Score resolution (0-point fix) ──────────────────────────────────────
+  // ── Score resolution (INVARIANT-SCORE-01, INVARIANT-SCORE-02, INVARIANT-SCORE-03) ──
   // 1. Try the explicit numeric score field first.
   const rawScore = toFiniteNumber(pick(nested, ['score', 'rating', 'points']));
-  // 2. Clamp to [1, 10] to reject wild values (e.g. percentage 85 -> clamped to 10).
-  const clampedScore =
-    rawScore !== null && rawScore >= 0.5 && rawScore <= 10
-      ? rawScore
-      : rawScore !== null && rawScore > 10
-        ? Math.min(rawScore / 10, 10) // handle 0-100 scale
-        : null;
-  // 3. If still null, infer from content richness.
-  const score = clampedScore ?? inferScoreFromContent(claim, reasoning, evidence, suggestions);
+  // 2. Validate and clamp: 0.0 is explicitly VALID and PRESERVED.
+  let score: number | null = null;
+  let scoreSource: 'LLM_EVALUATED' | 'NO_SCORE' = 'NO_SCORE';
+  if (rawScore !== null) {
+    if (rawScore >= 0 && rawScore <= 10) {
+      score = rawScore;
+      scoreSource = 'LLM_EVALUATED';
+    } else if (rawScore > 10 && rawScore <= 100) {
+      score = Math.min(+(rawScore / 10).toFixed(1), 10);
+      scoreSource = 'LLM_EVALUATED';
+    }
+  }
 
   const feedback: LogicCoachFeedback = {
     score,
@@ -332,6 +322,7 @@ export function normalizeLogicCoachFeedback(value: unknown): LogicCoachFeedback 
     strengths: toStringArray(pick(nested, ['strengths', 'strength', 'pros'])),
     weaknesses: toStringArray(pick(nested, ['weaknesses', 'weakness', 'cons'])),
     actionable_suggestions: suggestions,
+    score_source: scoreSource,
   };
 
   return isLogicCoachFeedback(feedback) ? feedback : null;
@@ -396,24 +387,24 @@ export function parseLogicCoachContent(raw: string | null | undefined): ParseLog
  *   - object  — already-parsed LogicCoachFeedback (pass-through via normalise)
  *   - null/undefined — treated as empty
  *
- * On parse failure: returns a visible-error fallback with score=4.0 (not 0)
- * so the UI shows a non-zero score that flags something went wrong without
- * silently appearing as an empty 0/10 response.
+ * Strict Score Integrity (INVARIANT-SCORE-01, INVARIANT-SCORE-03):
+ * On parse failure, returns explicit error state with score: null (NO fabricated 4.0 score).
  */
 export function adaptLogicCoachPayload(raw: string | null | undefined | unknown): LogicCoachFeedback {
   // If already an object (e.g. passed from a prior parse step), normalise directly.
   if (raw !== null && raw !== undefined && typeof raw === 'object') {
     const normalized = normalizeLogicCoachFeedback(raw);
     if (normalized) return normalized;
-    // Object was present but failed schema validation — fall through to error fallback.
+    // Object was present but failed schema validation — fall through to error state.
     console.warn('[COACH_PARSER] Object input failed schema validation:', JSON.stringify(raw).slice(0, 200));
     return {
-      score: 4.0,
+      score: null,
       cre_analysis: { claim: '', reasoning: '', evidence: '' },
       fallacies_detected: [],
       strengths: [],
       weaknesses: ['Phản hồi từ Logic Coach không đúng định dạng.'],
       actionable_suggestions: ['Vui lòng thử lại lượt tiếp theo.'],
+      score_source: 'PARSE_FAILED',
     };
   }
 
@@ -422,11 +413,10 @@ export function adaptLogicCoachPayload(raw: string | null | undefined | unknown)
     return result.feedback;
   }
 
-  // Parse failed — log the reason and return a clean fallback.
-  // NEVER dump raw model text into cre_analysis fields.
+  // Parse failed — log the reason and return explicit missing state with score: null.
   console.warn('[COACH_PARSER] Parse failed:', result.reason, '— raw preview:', (result.raw || '').slice(0, 150));
   return {
-    score: 4.0,
+    score: null,
     cre_analysis: {
       claim: '',
       reasoning: '',
@@ -436,5 +426,6 @@ export function adaptLogicCoachPayload(raw: string | null | undefined | unknown)
     strengths: [],
     weaknesses: ['Logic Coach chưa thể phân tích phản hồi này.'],
     actionable_suggestions: ['Vui lòng thử lại lượt tiếp theo.'],
+    score_source: 'PARSE_FAILED',
   };
 }

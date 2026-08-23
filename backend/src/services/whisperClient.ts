@@ -79,6 +79,11 @@ export interface SttResult {
 /**
  * Transcribe raw audio bytes using Whisper API.
  * Always resolves -- never rejects.
+ *
+ * Strict STT Integrity (INVARIANT-SCORE-07):
+ * STT failure or missing credentials must NEVER fabricate sample speech content
+ * ("đồng phục học sinh"). It must return an empty transcript with an explicit
+ * failure reason.
  */
 export async function transcribeBuffer(
   audioBuffer: Buffer | null,
@@ -88,15 +93,17 @@ export async function transcribeBuffer(
   const client = getClient();
 
   if (!client) {
-    console.info('[WHISPER_STT] No API key configured. Using mock STT.');
-    const mock = mockTranscribe(duration_ms);
-    return { transcript: mock.transcript, stt_source: 'mock', fallback_reason: 'No API key configured' };
+    if (process.env['NODE_ENV'] === 'test' && process.env['ENABLE_MOCK_STT'] === 'true') {
+      const mock = mockTranscribe(duration_ms);
+      return { transcript: mock.transcript, stt_source: 'mock', fallback_reason: 'Test mock STT' };
+    }
+    console.warn('[WHISPER_STT] No API key configured. Returning empty transcript.');
+    return { transcript: '', stt_source: 'whisper', fallback_reason: 'STT_NOT_CONFIGURED' };
   }
 
   if (!audioBuffer || audioBuffer.length < 100) {
-    console.warn('[WHISPER_STT] Audio buffer empty or too small. Using mock STT.');
-    const mock = mockTranscribe(duration_ms);
-    return { transcript: mock.transcript, stt_source: 'mock', fallback_reason: 'Empty audio buffer' };
+    console.warn('[WHISPER_STT] Audio buffer empty or too small.');
+    return { transcript: '', stt_source: 'whisper', fallback_reason: 'STT_EMPTY_BUFFER' };
   }
 
   try {
@@ -115,18 +122,16 @@ export async function transcribeBuffer(
     const transcript = response.text?.trim() ?? '';
 
     if (!transcript) {
-      console.warn('[WHISPER_STT] Empty transcript returned. Using mock STT.');
-      const mock = mockTranscribe(duration_ms);
-      return { transcript: mock.transcript, stt_source: 'mock', fallback_reason: 'Empty transcript from API' };
+      console.warn('[WHISPER_STT] Empty transcript returned from API.');
+      return { transcript: '', stt_source: 'whisper', fallback_reason: 'STT_EMPTY_TRANSCRIPT' };
     }
 
     console.info(`[WHISPER_STT] OK -- ${transcript.split(/\s+/).length} words via ${model}`);
     return { transcript, stt_source: 'whisper' };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[WHISPER_STT] API call failed: ${message}. Falling back to mock STT.`);
-    const mock = mockTranscribe(duration_ms);
-    return { transcript: mock.transcript, stt_source: 'mock', fallback_reason: `API error: ${message}` };
+    console.error(`[WHISPER_STT] API call failed: ${message}.`);
+    return { transcript: '', stt_source: 'whisper', fallback_reason: `STT_API_ERROR: ${message}` };
   }
 }
 

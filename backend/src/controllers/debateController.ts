@@ -51,7 +51,10 @@ const DEMO_USER_ID = '22222222-2222-2222-2222-222222222222';
  */
 export async function createDebateSession(req: Request, res: Response) {
   try {
-    const { userId, topic, character_id, user_side } = req.body;
+    const authUserId = (req as any).userId;
+    const bodyUserId = req.body.userId;
+    const userId = authUserId || bodyUserId;
+    const { topic, character_id, user_side } = req.body;
     const rawMode = req.body.inputMode || req.body.input_mode || 'text';
     const inputMode = String(rawMode).toLowerCase() === 'voice' ? 'voice' : 'text';
 
@@ -262,6 +265,82 @@ export async function createDebateSession(req: Request, res: Response) {
   }
 }
 
+// ─── Input Validation Gate (INVARIANT-SCORE-06) ───────────────────────────────
+
+/**
+ * Deterministic Input Validation Gate for Debate Turns.
+ * Rejects empty, filler-only, noise, or sub-threshold inputs BEFORE:
+ * - Persisting official DebateTranscript
+ * - Calling Opponent LLM
+ * - Calling Logic Coach LLM
+ * - Consuming user quota
+ */
+const MIN_WORDS_THRESHOLD = 3; // Minimal meaningful utterance threshold
+const KNOWN_FILLER_SET = new Set([
+  'à', 'ừ', 'ừm', 'ờ', 'ơ', 'ơm', 'ắng', 'ư', 'uhm', 'umm', 'um', 'uh', 'er', 'ah', 'hmm', 'hmmm',
+  'thì', 'mà', 'là', 'vậy', 'nhỉ', 'nhé', 'hả', 'ha', 'kiểu',
+]);
+
+export interface TurnValidationResult {
+  isValid: boolean;
+  errorCode?: 'EMPTY_SPEECH' | 'FILLER_ONLY' | 'TOO_SHORT_OR_MEANINGLESS';
+  errorMessage?: string;
+  normalizedText: string;
+}
+
+export function validateDebateTurnInput(rawContent: unknown): TurnValidationResult {
+  if (typeof rawContent !== 'string') {
+    return {
+      isValid: false,
+      errorCode: 'EMPTY_SPEECH',
+      errorMessage: 'Nội dung phát biểu không hợp lệ.',
+      normalizedText: '',
+    };
+  }
+
+  const normalized = rawContent.trim();
+  if (!normalized) {
+    return {
+      isValid: false,
+      errorCode: 'EMPTY_SPEECH',
+      errorMessage: 'Không ghi nhận được âm thanh hoặc nội dung phát biểu.',
+      normalizedText: '',
+    };
+  }
+
+  // Tokenize and clean punctuation to check if string consists purely of fillers
+  const cleanTokens = normalized
+    .toLowerCase()
+    .replace(/[.,!?:;…\-–—~"'`()[\]{}]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (cleanTokens.length === 0 || cleanTokens.every((t) => KNOWN_FILLER_SET.has(t))) {
+    return {
+      isValid: false,
+      errorCode: 'FILLER_ONLY',
+      errorMessage: 'Phát biểu chỉ chứa từ đệm hoặc âm thanh thừa. Vui lòng trình bày rõ ràng luận điểm của bạn.',
+      normalizedText: normalized,
+    };
+  }
+
+  // Count words
+  const words = normalized.split(/\s+/).filter(Boolean);
+  if (words.length < MIN_WORDS_THRESHOLD) {
+    return {
+      isValid: false,
+      errorCode: 'TOO_SHORT_OR_MEANINGLESS',
+      errorMessage: 'Phát biểu quá ngắn để cấu thành một luận điểm tranh biện (tối thiểu 3 từ có nghĩa). Vui lòng phát biểu lại.',
+      normalizedText: normalized,
+    };
+  }
+
+  return {
+    isValid: true,
+    normalizedText: normalized,
+  };
+}
+
 // ─── Message Handler ─────────────────────────────────────────────────────────
 
 /**
@@ -272,7 +351,9 @@ export async function createDebateSession(req: Request, res: Response) {
 export async function handleDebateMessage(req: Request, res: Response) {
   try {
     const rawSessionId = req.params.sessionId;
-    const { userId, content, stance, topic, coachHistory, voiceMetrics, argumentContext } = req.body;
+    const authUserId = (req as any).userId;
+    const { userId: bodyUserId, content, stance, topic, coachHistory, voiceMetrics, argumentContext } = req.body;
+    const userId = authUserId || bodyUserId;
 
     if (typeof rawSessionId !== 'string' || !rawSessionId) {
       return res.status(400).json({ error: 'Invalid or missing sessionId' });
@@ -284,6 +365,21 @@ export async function handleDebateMessage(req: Request, res: Response) {
       return res.status(400).json({ error: 'Missing required fields: userId, content, stance' });
     }
 
+    // 0. Input Validation Gate (INVARIANT-SCORE-06: Invalid turn MUST NOT enter scoring pipeline)
+    const validation = validateDebateTurnInput(content);
+    if (!validation.isValid) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: validation.errorCode || 'EMPTY_OR_INVALID_TURN',
+          message: validation.errorMessage || 'Lượt nói không hợp lệ.',
+          retryable: true,
+        },
+      });
+    }
+
+    const canonicalContent = validation.normalizedText;
+
     // 1. Verify session exists.
     const session = await prisma.debateSession.findUnique({
       where: { id: sessionId },
@@ -293,6 +389,14 @@ export async function handleDebateMessage(req: Request, res: Response) {
       return res.status(404).json({
         error: 'SESSION_NOT_FOUND',
         message: 'Debate session not found.',
+      });
+    }
+
+    // 1b. Tenant isolation: verify session ownership
+    if (authUserId && session.userId !== authUserId) {
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message: 'Forbidden: session belongs to another user',
       });
     }
 
@@ -338,15 +442,30 @@ export async function handleDebateMessage(req: Request, res: Response) {
       });
     }
 
-    // 4. Persist user turn to DebateTranscript.
-    const userTranscript = await prisma.debateTranscript.create({
-      data: {
-        sessionId,
-        speakerType: 'user',
-        turnNumber: userTurnNumber,
-        textContent: content,
-      },
-    });
+    // 4. Persist user turn to DebateTranscript with collision safety.
+    let userTranscript;
+    try {
+      userTranscript = await prisma.debateTranscript.create({
+        data: {
+          sessionId,
+          speakerType: 'user',
+          turnNumber: userTurnNumber,
+          textContent: canonicalContent,
+        },
+      });
+    } catch (dbErr: any) {
+      // Handle race condition / unique turn constraint collision (P2002)
+      if (dbErr?.code === 'P2002' || String(dbErr?.message).includes('unique')) {
+        console.warn('[TURN_COLLISION_DETECTED]', { sessionId, userTurnNumber });
+        return res.status(409).json({
+          success: false,
+          error: 'TURN_COLLISION',
+          message: 'Lượt tranh biện đang được xử lý hoặc đã tồn tại. Vui lòng thử lại sau giây lát.',
+          retryable: true,
+        });
+      }
+      throw dbErr;
+    }
 
     // 5. Load conversation history from persisted transcripts.
     const MAX_HISTORY_ENTRIES = 4;
@@ -487,15 +606,23 @@ export async function handleDebateMessage(req: Request, res: Response) {
     }
 
     // 8. Persist opponent turn to DebateTranscript.
-    await prisma.debateTranscript.create({
-      data: {
-        sessionId,
-        speakerType: 'ai',
-        turnNumber: opponentTurnNumber,
-        textContent: opponentText,
-        audioPath: opponentAudioPath,
-      },
-    });
+    try {
+      await prisma.debateTranscript.create({
+        data: {
+          sessionId,
+          speakerType: 'ai',
+          turnNumber: opponentTurnNumber,
+          textContent: opponentText,
+          audioPath: opponentAudioPath,
+        },
+      });
+    } catch (oppErr: any) {
+      if (oppErr?.code === 'P2002' || String(oppErr?.message).includes('unique')) {
+        console.warn('[OPPONENT_TURN_COLLISION_DETECTED]', { sessionId, opponentTurnNumber });
+      } else {
+        throw oppErr;
+      }
+    }
 
     // 9. Attach coach evaluation metadata to user transcript.
     const voiceTelemetry =
@@ -572,7 +699,8 @@ export async function handleDebateMessage(req: Request, res: Response) {
             if (typeof item === 'string' && item.startsWith('__coach__')) {
               try {
                 const parsed = JSON.parse(item.slice(9));
-                if (typeof parsed.score === 'number' && parsed.score > 0) {
+                // INVARIANT-SCORE-02: 0.0 is explicitly VALID and MUST be included in averages
+                if (typeof parsed.score === 'number' && Number.isFinite(parsed.score) && parsed.score >= 0 && parsed.score <= 10) {
                   scores.push(parsed.score);
                   found = true;
                   break;
@@ -581,13 +709,13 @@ export async function handleDebateMessage(req: Request, res: Response) {
             }
           }
         }
-        if (!found && ut.evidenceStar) {
+        if (!found && typeof ut.evidenceStar === 'number' && ut.evidenceStar > 0) {
           scores.push(Math.min(10, Math.max(1, ut.evidenceStar * 2)));
         }
       }
       const runningScore = scores.length > 0
         ? +(scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
-        : (coachFeedback?.score || 7.8);
+        : (typeof coachFeedback?.score === 'number' ? coachFeedback.score : 0);
 
       await prisma.debateSession.update({
         where: { id: sessionId },
@@ -672,7 +800,7 @@ export async function listUserSessions(req: Request, res: Response): Promise<voi
         .find((t) => t.evidenceStar != null)?.evidenceStar ?? null;
 
       let scoreNum = Number(s.scoreTotal);
-      if (!scoreNum || scoreNum <= 0) {
+      if (isNaN(scoreNum)) {
         const scores: number[] = [];
         for (const ut of userTurns) {
           let found = false;
@@ -681,7 +809,7 @@ export async function listUserSessions(req: Request, res: Response): Promise<voi
               if (typeof item === 'string' && item.startsWith('__coach__')) {
                 try {
                   const parsed = JSON.parse(item.slice(9));
-                  if (typeof parsed.score === 'number' && parsed.score > 0) {
+                  if (typeof parsed.score === 'number' && Number.isFinite(parsed.score) && parsed.score >= 0 && parsed.score <= 10) {
                     scores.push(parsed.score);
                     found = true;
                     break;
@@ -690,13 +818,13 @@ export async function listUserSessions(req: Request, res: Response): Promise<voi
               }
             }
           }
-          if (!found && ut.evidenceStar) {
+          if (!found && typeof ut.evidenceStar === 'number' && ut.evidenceStar > 0) {
             scores.push(Math.min(10, Math.max(1, ut.evidenceStar * 2)));
           }
         }
         scoreNum = scores.length > 0
           ? +(scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
-          : (userTurns.length > 0 ? 7.8 : 8.0);
+          : 0;
       }
 
       return {
@@ -708,9 +836,9 @@ export async function listUserSessions(req: Request, res: Response): Promise<voi
         user_side: s.userSide,
         input_mode: s.inputMode || 'text',
         score_total: scoreNum,
-        score_content: Math.min(10, +(scoreNum * 0.98).toFixed(1)),
-        score_style: Math.min(10, +(scoreNum * 1.02).toFixed(1)),
-        score_strategy: Math.min(10, +(scoreNum * 0.95).toFixed(1)),
+        score_content: null,
+        score_style: null,
+        score_strategy: null,
         turn_count: Math.max(1, userTurns.length),
         last_evidence_star: lastStar,
         created_at: s.createdAt.toISOString(),
@@ -749,6 +877,13 @@ export async function getSessionDetail(req: Request, res: Response): Promise<voi
       return;
     }
 
+    // Enforce session ownership
+    const authUserId = (req as any).userId;
+    if (authUserId && session.userId !== authUserId) {
+      res.status(403).json({ error: 'FORBIDDEN', message: 'Forbidden: session belongs to another user' });
+      return;
+    }
+
     const transcripts = await prisma.debateTranscript.findMany({
       where: { sessionId },
       orderBy: { turnNumber: 'asc' },
@@ -777,20 +912,9 @@ export async function getSessionDetail(req: Request, res: Response): Promise<voi
         }
       }
 
-      // If no stored coach snapshot, provide structured C-R-E fallback from stored turn
+      // If no stored coach snapshot, do NOT fabricate fake score (INVARIANT-SCORE-01, INVARIANT-SCORE-03)
       if (!coachFeedback && t.speakerType === 'user') {
-        coachFeedback = {
-          score: 8.0,
-          cre_analysis: {
-            claim: 'Luận điểm rõ ràng, trực diện với kiến nghị.',
-            reasoning: 'Mạch liên kết nguyên nhân - kết quả logic.',
-            evidence: 'Cần bổ sung dẫn chứng định lượng.',
-          },
-          fallacies_detected: fallacies,
-          strengths: ['Bảo vệ tốt lập trường', 'Lập luận mạch lạc'],
-          weaknesses: ['Chưa mở rộng phản biện đa chiều'],
-          actionable_suggestions: ['Bổ sung số liệu thực tế để tăng sức thuyết phục'],
-        };
+        coachFeedback = null;
       }
 
       return {
@@ -816,14 +940,14 @@ export async function getSessionDetail(req: Request, res: Response): Promise<voi
     });
 
     let scoreNum = Number(session.scoreTotal);
-    if (!scoreNum || scoreNum <= 0) {
+    if (isNaN(scoreNum)) {
       const userTurns = turns.filter((t) => (t.speaker_type || t.speakerType) === 'user');
       const scores = userTurns
-        .map((t) => t.coach_feedback?.score || (t.evidence_star ? Math.min(10, t.evidence_star * 2) : null))
-        .filter((sc): sc is number => typeof sc === 'number' && sc > 0);
+        .map((t) => (typeof t.coach_feedback?.score === 'number' ? t.coach_feedback.score : (t.evidence_star ? Math.min(10, t.evidence_star * 2) : null)))
+        .filter((sc): sc is number => typeof sc === 'number' && Number.isFinite(sc) && sc >= 0 && sc <= 10);
       scoreNum = scores.length > 0
         ? +(scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
-        : (userTurns.length > 0 ? 7.8 : 8.0);
+        : 0;
     }
 
     const sessionPayload = {
@@ -835,9 +959,9 @@ export async function getSessionDetail(req: Request, res: Response): Promise<voi
       user_side: session.userSide,
       input_mode: session.inputMode || 'text',
       score_total: scoreNum,
-      score_content: Math.min(10, +(scoreNum * 0.98).toFixed(1)),
-      score_style: Math.min(10, +(scoreNum * 1.02).toFixed(1)),
-      score_strategy: Math.min(10, +(scoreNum * 0.95).toFixed(1)),
+      score_content: null,
+      score_style: null,
+      score_strategy: null,
       max_turns: MAX_TURNS_PER_SESSION,
       created_at: session.createdAt.toISOString(),
     };

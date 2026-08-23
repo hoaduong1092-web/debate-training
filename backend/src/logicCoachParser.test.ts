@@ -1,12 +1,17 @@
 /**
  * Offline contract test: backend parser output vs frontend isCoachFeedback.
  * Zero network / zero AI calls.
+ *
+ * Score Integrity Remediated Contract (INVARIANT-SCORE-01 to 03):
+ * - Score 0 is a valid score (never converted to fallback or null).
+ * - Missing score returns score: null and score_source: 'NO_SCORE'.
+ * - Parse error returns score: null and score_source: 'PARSE_FAILED'.
  */
 import {
   adaptLogicCoachPayload,
   isLogicCoachFeedback,
   parseLogicCoachContent,
-} from './services/logicCoachParser';
+} from './services/logicCoachParser.js';
 
 /** Exact frontend CoachFeedback guard (frontend/src/lib/api.ts). */
 function isCoachFeedback(value: unknown): boolean {
@@ -14,7 +19,7 @@ function isCoachFeedback(value: unknown): boolean {
     return false;
   }
   const v = value as Record<string, unknown>;
-  if (typeof v.score !== 'number') {
+  if (v.score !== null && (typeof v.score !== 'number' || !Number.isFinite(v.score) || v.score < 0 || v.score > 10)) {
     return false;
   }
   const cre = v.cre_analysis;
@@ -102,6 +107,49 @@ function main(): void {
     assert('backend isLogicCoachFeedback(valid)', isLogicCoachFeedback(parsed.feedback));
   }
 
+  // ── INVARIANT-SCORE-02: Score 0 is valid and preserved ─────────────────
+  const scoreZeroPayload = JSON.stringify({
+    score: 0,
+    cre_analysis: {
+      claim: 'Không xác định được luận điểm rõ ràng.',
+      reasoning: 'Không có lý lẽ nào được trình bày.',
+      evidence: 'Không có dẫn chứng nào được cung cấp.',
+    },
+    fallacies_detected: ['Phát biểu rỗng'],
+    strengths: [],
+    weaknesses: ['Chưa có luận cứ'],
+    actionable_suggestions: ['Trình bày luận điểm hoàn chỉnh'],
+  });
+  const zeroParsed = parseLogicCoachContent(scoreZeroPayload);
+  assert('score 0 parsed.ok === true', zeroParsed.ok === true);
+  if (zeroParsed.ok) {
+    assert('score 0 preserved as 0 (not null, not 4, not 8)', zeroParsed.feedback.score === 0);
+    assert('score 0 source is LLM_EVALUATED', zeroParsed.feedback.score_source === 'LLM_EVALUATED');
+    assert('score 0 passes isLogicCoachFeedback', isLogicCoachFeedback(zeroParsed.feedback));
+    assert('score 0 passes frontend isCoachFeedback', isCoachFeedback(zeroParsed.feedback));
+  }
+
+  // ── INVARIANT-SCORE-03: Missing score returns null, NO INFERENCE ────────
+  const missingScorePayload = JSON.stringify({
+    cre_analysis: {
+      claim: 'Dong phuc thuc day binh dang hoc duong.',
+      reasoning: 'Giam bot khoang cach giau ngheo.',
+      evidence: 'Khao sat tai 50 truong trung hoc.',
+    },
+    fallacies_detected: [],
+    strengths: ['Dan chung tot'],
+    weaknesses: [],
+    actionable_suggestions: [],
+  });
+  const missingParsed = parseLogicCoachContent(missingScorePayload);
+  assert('missing score parsed.ok === true', missingParsed.ok === true);
+  if (missingParsed.ok) {
+    assert('missing score is null (no fake inference)', missingParsed.feedback.score === null);
+    assert('missing score source is NO_SCORE', missingParsed.feedback.score_source === 'NO_SCORE');
+    assert('missing score passes isLogicCoachFeedback', isLogicCoachFeedback(missingParsed.feedback));
+    assert('missing score passes frontend isCoachFeedback', isCoachFeedback(missingParsed.feedback));
+  }
+
   const fenced = adaptLogicCoachPayload('```json\n' + JSON.stringify(VALID) + '\n```');
   assert('fenced adapter isCoachFeedback', isCoachFeedback(fenced));
   assert('fenced has no raw key as payload', !('raw' in fenced && !('score' in fenced)));
@@ -123,9 +171,11 @@ function main(): void {
   );
   assert('noisy wrapper isCoachFeedback', isCoachFeedback(noisy));
 
+  // ── INVARIANT-SCORE-01: Malformed adapter returns score: null (PARSE_FAILED)
   const malformed = adaptLogicCoachPayload('{ score: 1, not json');
   assert('malformed adapter still isCoachFeedback', isCoachFeedback(malformed));
-  assert('malformed not {raw}-only', typeof (malformed as { score: number }).score === 'number');
+  assert('malformed score is null (not 4.0)', malformed.score === null);
+  assert('malformed score_source is PARSE_FAILED', malformed.score_source === 'PARSE_FAILED');
 
   const missing = adaptLogicCoachPayload(JSON.stringify({ score: 5, cre_analysis: { claim: 'only' } }));
   assert('partial CRE adapter isCoachFeedback', isCoachFeedback(missing));
@@ -133,6 +183,8 @@ function main(): void {
 
   const empty = adaptLogicCoachPayload('');
   assert('empty adapter isCoachFeedback', isCoachFeedback(empty));
+  assert('empty adapter score is null', empty.score === null);
+  assert('empty adapter score_source is PARSE_FAILED', empty.score_source === 'PARSE_FAILED');
 
   const httpShape = {
     success: true,

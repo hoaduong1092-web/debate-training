@@ -144,7 +144,7 @@ export interface TurnData {
   turnNumber: number;
   userText: string;
   opponentText: string;
-  logicScore: number;
+  logicScore: number | null;
   cre: { claim: string; reasoning: string; evidence: string };
   evidenceStar?: number;
   fallacies: string[];
@@ -287,162 +287,7 @@ export interface DebateArenaProps {
   t?: Strings;
 }
 
-// --- DYNAMIC CONTEXT-AWARE OPPONENT REBUTTAL GENERATOR (FOR ALL TURNS 1 to 30+) ---
-function generateDynamicOpponentRebuttal(
-  turnNum: number,
-  userText: string,
-  stance: DebateStance,
-  _topic: string,
-): string {
-  const isAffirmative = stance === 'AFFIRMATIVE';
-  const lower = userText.toLowerCase();
 
-  // 1. Keyword-based tailored rebuttals
-  if (lower.includes('cảm xúc') || lower.includes('thấu cảm') || lower.includes('tâm lý')) {
-    return isAffirmative
-      ? `Ở Lượt ${turnNum}, bạn lập luận rằng AI có thể nhận diện cảm xúc. Tuy nhiên, nhận diện biểu cảm quang học chỉ là thuật toán khớp mẫu (pattern matching), hoàn toàn không phải sự thấu cảm sinh học hay tình thương của một người thầy khi học trò gặp khủng hoảng tâm lý thực sự.`
-      : `Ở Lượt ${turnNum}, bạn cho rằng AI thiếu thấu cảm. Nhưng thực tế mô hình AI hiện đại được đào tạo trên hàng triệu ca tư vấn tâm lý, phản hồi kiên nhẫn và khách quan 24/7 mà không bao giờ mất bình tĩnh hay có thành kiến định kiến cá nhân như con người.`;
-  }
-
-  if (lower.includes('chấm bài') || lower.includes('soạn') || lower.includes('nhàn') || lower.includes('tự động')) {
-    return isAffirmative
-      ? `Tại Lượt ${turnNum}, bạn cho rằng AI giúp chấm bài và soạn giáo án giúp giáo viên nhàn hơn. Điều này chỉ chứng minh AI là 'công cụ hỗ trợ' (Assistant), chứ không thể thay thế vai trò dẫn dắt tinh thần và truyền lửa tri thức của người thầy trên bục giảng.`
-      : `Tại Lượt ${turnNum}, việc AI tự động hóa toàn bộ khâu chuẩn bị bài giảng, cá nhân hóa bài tập và chấm điểm thời gian thực chứng minh mô hình lớp học truyền thống 1 thầy - 40 trò đã lỗi thời và hoàn toàn có thể được số hóa toàn diện.`;
-  }
-
-  if ((lower.includes('vấn đề') && lower.includes('suy ngẫm')) || lower.includes('đòi hỏi') || lower.includes('bối cảnh')) {
-    return isAffirmative
-      ? `Ở Lượt ${turnNum}, câu hỏi bạn đặt ra về việc 'nhà giáo dục phải liên tục suy ngẫm' chính là bằng chứng xác thực: Năng lực tự phản tỉnh, trăn trở sư phạm và định hình triết lý giáo dục là đặc quyền của ý thức con người mà không thuật toán nào tự sinh ra được.`
-      : `Ở Lượt ${turnNum}, việc giáo dục chuyển dịch đòi hỏi năng lực tự học và tư duy mở của học sinh; AI cung cấp không gian tương tác vô hạn để học sinh tự vấn, thử nghiệm và phản biện mà không bị gò bó bởi năng lực của một cá nhân giáo viên đơn lẻ.`;
-  }
-
-  if (lower.includes('chi phí') || lower.includes('vùng sâu') || lower.includes('tiếp cận') || lower.includes('kinh tế')) {
-    return isAffirmative
-      ? `Đối với luận điểm Lượt ${turnNum} về chi phí và vùng sâu vùng xa: Hạ tầng công nghệ tại các vùng khó khăn còn hạn chế, và việc đưa AI vào mà thiếu đi người thầy tận tụy cầm tay chỉ chữ sẽ chỉ làm gia tăng hố sâu khoảng cách giáo dục.`
-      : `Đối với luận điểm Lượt ${turnNum}: AI chính là chìa khóa dân chủ hóa giáo dục, giúp học sinh ở mọi vùng miền tiếp cận nguồn tri thức tinh hoa toàn cầu với chi phí gần như bằng không mà không phụ thuộc vào sự phân bổ giáo viên bất bình đẳng.`;
-  }
-
-  // 2. Turn-sequence specific debate clash arguments (1 to 20+)
-  const oppRebuttalsAffirmative = [
-    /* 1 */ 'Trí tuệ nhân tạo có thể phân tích dữ liệu và số hóa kiến thức, nhưng bản chất cốt lõi của giáo dục là truyền cảm hứng và bồi dưỡng nhân cách — điều chỉ con người mới có thể trao cho con người.',
-    /* 2 */ 'AI dù tối ưu đến đâu cũng chỉ hoạt động dựa trên xác suất thống kê từ quá khứ; nó không có tư duy phản biện độc lập hay năng lực đạo đức để giải quyết các tình huống sư phạm phát sinh ngoài dự kiến.',
-    /* 3 */ 'Bạn nhấn mạnh khả năng hiểu biết của AI, nhưng sự thấu cảm thuật toán không thể thay thế mối liên kết tâm lý sâu sắc giữa thầy và trò trong những giai đoạn định hình nhân sinh quan quan trọng.',
-    /* 4 */ 'Các tác vụ tự động hóa như soạn bài hay chấm thi chỉ biến AI thành công cụ trợ giảng đắc lực; việc đồng nhất công cụ hỗ trợ với việc thay thế hoàn toàn vị thế của nhà giáo là một ngụy biện đánh tráo khái niệm.',
-    /* 5 */ 'Rủi ro về thiên kiến thuật toán (Algorithmic Bias) và hiện tượng ảo giác AI (Hallucination) sẽ dẫn đến những sai lệch nghiêm trọng nếu trao toàn quyền giảng dạy và định hướng học sinh cho máy móc.',
-    /* 6 */ 'Xét về mặt so sánh tác động (Impact Comparison), một thế hệ học sinh chỉ tương tác với màn hình máy tính sẽ đối mặt với sự suy giảm nghiêm trọng về kỹ năng xã hội, trí tuệ cảm xúc (EQ) và khả năng thích ứng đời thực.',
-    /* 7 */ 'Người thầy không chỉ dạy chữ mà còn dạy làm người. AI không thể chịu trách nhiệm pháp lý hay đạo đức khi một học sinh đưa ra quyết định sai lầm dựa trên gợi ý từ hệ thống máy học.',
-    /* 8 */ 'Ở giai đoạn phản biện chuyên sâu Lượt 8: Nếu phụ thuộc toàn diện vào AI, tính tự chủ và khả năng nghi ngờ khoa học của học sinh sẽ bị xói mòn bởi thói quen chấp nhận câu trả lời sẵn có từ máy tính.',
-    /* 9 */ 'Tại Lượt 9, xét trên bình diện triết học giáo dục: Bản chất của sư phạm là quá trình chuyển hóa giữa hai chủ thể người - người. Máy móc chỉ cung cấp thông tin, còn người thầy xây dựng bản lĩnh và nhân cách.',
-    /* 10 */ 'Tại Lượt 10, tổng kết các điểm va chạm cốt lõi (Clash Points): Phe bạn chưa chứng minh được AI có thể thay thế trách nhiệm luân lý và tình thương của người thầy khi đối mặt với khủng hoảng học đường.',
-    /* 11 */ 'Bước vào các hiệp củng cố: Việc AI ngày càng thông minh hơn chỉ càng khẳng định con người cần những nhà giáo dục xuất sắc để định hướng cách sử dụng công nghệ nhân văn và an toàn.',
-    /* 12 */ 'Tại hiệp mở rộng: Mọi dẫn chứng của bạn chỉ dừng lại ở hiệu suất xử lý tác vụ cơ học, trong khi giáo dục đích thực là sự đánh thức tiềm năng con người — điều mà không thuật toán nào có thể thay thế.',
-  ];
-
-  const oppRebuttalsNegative = [
-    /* 1 */ 'Với tốc độ phát triển vượt bậc của các mô hình đa phương thức, gia sư AI cá nhân hóa 1:1 đang giải quyết triệt để bài toán quá tải và bất bình đẳng của nền giáo dục truyền thống.',
-    /* 2 */ 'AI không bị giới hạn bởi thời gian, không thiên vị, liên tục cập nhật kho tri thức nhân loại theo thời gian thực và thích ứng chính xác với tốc độ tiếp thu của từng cá nhân học sinh.',
-    /* 3 */ 'Các nghiên cứu thực nghiệm đã chứng minh gia sư AI tương tác thích ứng giúp học sinh tiến bộ nhanh gấp đôi so với lớp học thông thường nhờ phản hồi tức thì và không tạo áp lực tâm lý.',
-    /* 4 */ 'Khi AI đảm nhận hoàn hảo việc truyền thụ kiến thức và chấm điểm, mô hình trường học truyền thống sẽ chuyển dịch hoàn toàn sang nền tảng số hóa tự định hướng.',
-    /* 5 */ 'Xét về quy mô và hiệu quả kinh tế, AI có thể đưa nền giáo dục chuẩn quốc tế đến hàng trăm triệu học sinh vùng sâu vùng xa với chi phí gần như bằng 0.',
-    /* 6 */ 'Tương lai của giáo dục không nằm ở việc duy trì lối mòn giảng dạy thủ công, mà là trao quyền cho người học làm chủ tri thức thông qua hệ sinh thái AI toàn diện.',
-    /* 7 */ 'Các rào cản về cảm xúc hay đạo đức hoàn toàn có thể được lập trình và chuẩn hóa thông qua các bộ quy tắc an toàn AI nghiêm ngặt, vượt trội hơn tính chủ quan của con người.',
-    /* 8 */ 'Ở Lượt 8: Việc AI giải phóng học sinh khỏi sự phụ thuộc vào trình độ giáo viên không đồng đều là bước đột phá công bằng nhất trong lịch sử phát triển giáo dục.',
-    /* 9 */ 'Tại Lượt 9: Khi công nghệ số hóa tái cấu trúc thị trường lao động, mô hình giáo viên truyền thống giảng bài tập trung sẽ bị thay thế bởi mô hình AI cá nhân hóa toàn diện theo năng lực từng học sinh.',
-    /* 10 */ 'Tại Lượt 10, đòn bẩy quyết định: Hiệu quả cá nhân hóa 1:1 của AI vượt trội hoàn toàn so với mô hình 1 giáo viên dạy 40 học sinh cùng một tốc độ và một giáo án cứng nhắc.',
-    /* 11 */ 'Bước vào các hiệp mở rộng: Dữ liệu thực tế cho thấy các nền tảng AI giáo dục thế hệ mới đang thay thế dần từng môn học và chứng chỉ với độ chính xác và độ hài lòng cao hơn giáo viên người thật.',
-    /* 12 */ 'Tại hiệp mở rộng: Sự chuyển dịch vai trò từ giáo viên truyền thống sang AI là quy luật tiến hóa tất yếu của xã hội tri thức số hóa toàn cầu.',
-  ];
-
-  const list = isAffirmative ? oppRebuttalsAffirmative : oppRebuttalsNegative;
-  if (turnNum >= 1 && turnNum <= list.length && list[turnNum - 1]) {
-    return list[turnNum - 1] as string;
-  }
-  return isAffirmative
-    ? `Tại Lượt ${turnNum}: Luận điểm của bạn chưa vượt qua được ranh giới cốt lõi giữa việc tự động hóa công cụ và thay thế trọn vẹn sứ mệnh giáo dục nhân văn của người thầy.`
-    : `Tại Lượt ${turnNum}: Dữ liệu thực nghiệm ở lượt này tiếp tục củng cố rằng AI hoàn toàn vượt trội về tính cá nhân hóa và năng lực truyền thụ tri thức so với mô hình giáo viên truyền thống.`;
-}
-
-// --- DYNAMIC PEDAGOGICAL LOGIC COACH FEEDBACK GENERATOR (TURNS 1 to 30+) ---
-function generateDynamicCoachFeedback(
-  turnNum: number,
-  _userText: string,
-  _stance: DebateStance,
-  _topic: string,
-) {
-  const claimsByTurn = [
-    'Xác lập lập trường và định vị khái niệm nền tảng của kiến nghị.',
-    'Phát triển cơ chế nhân quả và tính khả thi trong thực tiễn.',
-    'Phân tích chiều sâu tâm lý và sự tương tác giữa chủ thể giáo dục.',
-    'Đánh giá hiệu suất lao động và tác động của tự động hóa giáo án/chấm thi.',
-    'Chất vấn rủi ro đạo đức, thiên kiến thuật toán và trách nhiệm pháp lý.',
-    'So sánh tác động (Impact Comparison) giữa giá trị con người và tối ưu hóa máy móc.',
-    'Phân tích tính bền vững tâm lý học đường và thói quen phụ thuộc công nghệ.',
-    'Phản biện chuyên sâu về năng lực tư duy độc lập và tự học của học sinh.',
-    'Phân định ranh giới triết học giữa truyền đạt dữ liệu và giáo dục nhân cách.',
-    'Tổng hợp toàn diện các điểm xung đột cốt lõi (Clash Points) và chốt hạ điểm then chốt.',
-    'Củng cố đòn bẩy tranh biện và phân tích hệ quả thực nghiệm lâu dài.',
-    'Khóa chặt luận cứ đối phương và khẳng định tính tất yếu của lập trường.',
-  ];
-
-  const reasoningsByTurn = [
-    'Mạch logic trực diện, liên kết chặt chẽ giữa tiền đề và kết luận của kiến nghị.',
-    'Lập luận có tính liên kết nhân quả, chỉ ra được các bước vận hành của cơ chế.',
-    'Khai thác tốt khía cạnh tâm lý học đường, đưa ra các giả định có sức thuyết phục cao.',
-    'Cấu trúc lập luận so sánh đối chiếu rõ ràng giữa mô hình truyền thống và hiện đại.',
-    'Đi sâu vào phân tích rủi ro hệ thống, chỉ ra điểm nghẽn mà đối phương chưa giải quyết.',
-    'Phương pháp so sánh tác động mạch lạc, đặt trọng số vào hệ quả lâu dài của người học.',
-    'Phân tích đa chiều về hành vi con người, làm rõ tác động tiêu cực của tính phụ thuộc.',
-    'Lập luận phản biện sắc bén, bóc tách và phản hồi trực tiếp các phản biện của đối thủ.',
-    'Mạch tư duy triết học sâu sắc, nâng tầm cuộc tranh biện lên bình diện giá trị nhân văn.',
-    'Kết nối toàn bộ các luận cứ xuyên suốt các hiệp đấu, tạo thành hệ thống bảo vệ vững chắc.',
-    'Phân tích đối trọng tác động (Tipping Point Analysis), chứng minh lập trường vượt trội.',
-    'Tổng kết mạch suy luận logic không thể bẻ gãy, kết hợp chặt chẽ giữa lý luận và thực tiễn.',
-  ];
-
-  const evidencesByTurn = [
-    'Dẫn chứng định tính tốt, nên bổ sung số liệu khảo sát thực tế để tăng tính thuyết phục.',
-    'Dẫn chứng về quy trình làm việc thực tế, cần dẫn thêm báo cáo từ các tổ chức giáo dục.',
-    'Dẫn chứng tâm lý thuyết phục, nên bổ sung nghiên cứu thực nghiệm về trí tuệ cảm xúc.',
-    'Dẫn chứng thực tế về các công cụ AI hiện nay, cần so sánh thêm năng suất cụ thể.',
-    'Dẫn chứng về các sự cố AI thực tế, cần làm rõ mức độ phổ biến trong môi trường giáo dục.',
-    'Dẫn chứng so sánh tác động rõ ràng, nên bổ sung số liệu dài hạn về năng lực học sinh.',
-    'Dẫn chứng về tác động tâm lý screen-time và sự tương tác xã hội của học sinh.',
-    'Dẫn chứng thực nghiệm về kết quả học tập khi có sự can thiệp của gia sư AI.',
-    'Dẫn chứng so sánh lịch sử phát triển của các cuộc cách mạng công nghệ trong giáo dục.',
-    'Dẫn chứng tổng hợp bao quát toàn bộ các luận điểm đã nêu trong trận đấu.',
-    'Dẫn chứng thực tế từ các mô hình thí điểm công nghệ giáo dục trên thế giới.',
-    'Dẫn chứng đối chiếu toàn diện giữa chi phí đầu tư và giá trị nhân văn đạt được.',
-  ];
-
-  const suggestionsByTurn = [
-    ['Định nghĩa rõ phạm vi khái niệm ngay từ đầu', 'Tạo tiền đề vững chắc cho các lượt sau'],
-    ['Định lượng hóa các tác động cụ thể', 'Sử dụng ví dụ thực tế tại các trường học'],
-    ['Chất vấn sâu hơn vào ranh giới thấu cảm sinh học', 'Áp dụng phản biện ngược'],
-    ['Làm rõ sự khác biệt giữa "công cụ hỗ trợ" và "thay thế hoàn toàn"', 'Nêu rõ ranh giới trách nhiệm'],
-    ['Đưa ra các tình huống đạo đức tiến thoái lưỡng nan (Ethical Dilemma)', 'Phân tích trách nhiệm pháp lý'],
-    ['Sử dụng thang đo So sánh Tác động (Scale vs Severity)', 'Nhấn mạnh hậu quả không thể đảo ngược'],
-    ['Phân tích tâm lý lứa tuổi học sinh', 'Đưa ra giải pháp giảm thiểu rủi ro'],
-    ['Tổng hợp các điểm xung đột then chốt (Key Clashes)', 'Tấn công vào mắt xích yếu nhất của đối phương'],
-    ['Nâng cao giá trị biểu cảm và tính thuyết phục sư phạm', 'Đưa ra tầm nhìn dài hạn của nền giáo dục'],
-    ['Chốt hạ 3 lý do cốt lõi để Ban Giám Khảo bỏ phiếu cho phe mình', 'Tóm tắt sắc bén, dứt khoát'],
-    ['Nhấn mạnh tính bất khả thi của mô hình đối lập', 'Củng cố các giả định thực nghiệm'],
-    ['Đúc kết bài học đắt giá và khẳng định giá trị cốt lõi', 'Hoàn tất phần trình bày trọn vẹn'],
-  ];
-
-  const idx = Math.min(turnNum - 1, claimsByTurn.length - 1);
-  const turnScore = Math.min(10.0, +(7.5 + Math.min(2.4, turnNum * 0.25)).toFixed(1));
-
-  return {
-    score: turnScore,
-    claim: `Luận điểm Lượt ${turnNum}: ${claimsByTurn[idx]}`,
-    reasoning: reasoningsByTurn[idx],
-    evidence: evidencesByTurn[idx],
-    suggestions: suggestionsByTurn[idx] || ['Củng cố thêm dẫn chứng thực nghiệm', 'Tập trung vào điểm xung đột then chốt'],
-    strengths: ['Lập luận chặt chẽ', `Bảo vệ tốt lập trường ở Lượt ${turnNum}`],
-    weaknesses: ['Cần mở rộng phản biện đa chiều hơn'],
-    evidenceStar: Math.min(5, Math.max(3, Math.round(turnScore / 2))),
-  };
-}
 
 export const DebateArena: React.FC<DebateArenaProps> = ({
   onNavigateToHistory,
@@ -784,7 +629,10 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
 
     // 2. Persist to local_debate_history_v15 (Strict UPSERT)
     try {
-      const avgScore = +(currentTurns.reduce((acc, t) => acc + t.logicScore, 0) / currentTurns.length).toFixed(1);
+      const scoredTurns = currentTurns.filter((t) => typeof t.logicScore === 'number' && Number.isFinite(t.logicScore));
+      const avgScore = scoredTurns.length > 0
+        ? +(scoredTurns.reduce((acc, t) => acc + (t.logicScore as number), 0) / scoredTurns.length).toFixed(1)
+        : 0;
       const rawHistory = localStorage.getItem('local_debate_history_v15');
       let historyList: any[] = [];
       if (rawHistory) {
@@ -829,9 +677,9 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
           input_mode: inputMode,
           status: isFinal ? 'COMPLETED' : 'IN_PROGRESS',
           score_total: avgScore,
-          score_content: +(avgScore * 0.98).toFixed(1),
-          score_style: +(avgScore * 1.02).toFixed(1),
-          score_strategy: +(avgScore * 0.99).toFixed(1),
+          score_content: null,
+          score_style: null,
+          score_strategy: null,
           created_at: summaryEntry.created_at,
         },
         transcripts: currentTurns.flatMap((t, idx) => [
@@ -937,24 +785,28 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
         }
 
         const coach = resp.data.coach_feedback;
-        const dynamicCoach = generateDynamicCoachFeedback(currentTurnNum, content, stance, topic);
-        const opponentReply = resp.data.opponent_response?.text || generateDynamicOpponentRebuttal(currentTurnNum, content, stance, topic);
+        const opponentReply = resp.data.opponent_response?.text || '';
         const opponentAudio = resp.data.opponent_response?.audio_url || resp.data.opponent_response?.audio_path || null;
+
+        // Strict Score Integrity (INVARIANT-SCORE-01, INVARIANT-SCORE-02, INVARIANT-SCORE-04)
+        const logicScore = typeof coach?.score === 'number' && Number.isFinite(coach.score) ? coach.score : null;
+        const evidenceStar = logicScore !== null ? Math.min(5, Math.max(1, Math.round(logicScore / 2))) : 1;
+
         const newTurn: TurnData = {
           turnNumber: currentTurnNum,
           userText: content,
           opponentText: opponentReply,
-          logicScore: coach?.score || dynamicCoach.score,
+          logicScore,
           cre: {
-            claim: coach?.cre_analysis?.claim || dynamicCoach.claim || 'Luận điểm định vị lập trường rõ ràng',
-            reasoning: coach?.cre_analysis?.reasoning || dynamicCoach.reasoning || 'Lập luận có tính liên kết chặt chẽ',
-            evidence: coach?.cre_analysis?.evidence || dynamicCoach.evidence || 'Cần bổ sung thêm dẫn chứng thực nghiệm',
+            claim: coach?.cre_analysis?.claim || '',
+            reasoning: coach?.cre_analysis?.reasoning || '',
+            evidence: coach?.cre_analysis?.evidence || '',
           },
-          evidenceStar: Math.min(5, Math.max(1, Math.round((coach?.score || dynamicCoach.score) / 2))),
+          evidenceStar,
           fallacies: coach?.fallacies_detected?.filter((f) => !f.startsWith('__voice__') && !f.startsWith('__coach__')) || [],
-          strengths: coach?.strengths && coach.strengths.length > 0 ? coach.strengths : dynamicCoach.strengths,
-          weaknesses: coach?.weaknesses && coach.weaknesses.length > 0 ? coach.weaknesses : dynamicCoach.weaknesses,
-          suggestions: coach?.actionable_suggestions && coach.actionable_suggestions.length > 0 ? coach.actionable_suggestions : dynamicCoach.suggestions,
+          strengths: coach?.strengths || [],
+          weaknesses: coach?.weaknesses || [],
+          suggestions: coach?.actionable_suggestions || [],
           wpm: voiceMetrics?.wpm ?? (resp.data.voice_telemetry?.wpm ?? undefined),
           fillers: voiceMetrics?.fillerCount ?? (resp.data.voice_telemetry?.filler_count ?? undefined),
           durationMs: voiceMetrics?.durationMs,
@@ -982,46 +834,10 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
           setShowSummaryModal(true);
         }
       }
-    } catch (err) {
-      console.error('[Arena] Error sending argument, using dynamic rebuttal engine:', err);
-      // Dynamic contextual rebuttal for any turn
-      const dynamicOpponent = generateDynamicOpponentRebuttal(currentTurnNum, content, stance, topic);
-      const dynamicCoach = generateDynamicCoachFeedback(currentTurnNum, content, stance, topic);
-      const fallbackTurn: TurnData = {
-        turnNumber: currentTurnNum,
-        userText: content,
-        opponentText: dynamicOpponent,
-        logicScore: dynamicCoach.score,
-        cre: {
-          claim: dynamicCoach.claim || 'Luận điểm định vị lập trường rõ ràng',
-          reasoning: dynamicCoach.reasoning || 'Lập luận có tính liên kết chặt chẽ',
-          evidence: dynamicCoach.evidence || 'Cần bổ sung thêm dẫn chứng thực nghiệm',
-        },
-        evidenceStar: dynamicCoach.evidenceStar,
-        fallacies: [],
-        strengths: dynamicCoach.strengths,
-        weaknesses: dynamicCoach.weaknesses,
-        suggestions: dynamicCoach.suggestions,
-        wpm: voiceMetrics?.wpm ?? undefined,
-        fillers: voiceMetrics?.fillerCount ?? undefined,
-        durationMs: voiceMetrics?.durationMs,
-        audioUrl: audioUrl || null,
-      };
-
-      const updatedTurns = [...turns, fallbackTurn];
-      setTurns(updatedTurns);
-      setSelectedTurn(updatedTurns.length - 1);
-      setInputText('');
-
-      // Save progress to history (atomic upsert, in-progress)
-      void saveSessionToHistory(updatedTurns, sessionId || stableSessionIdRef.current, false);
-
-      // Auto-play TTS on opponent response ONLY in Voice Mode for hands-free voice sparring
-      if (inputMode === 'voice' && autoPlayTts && dynamicOpponent) {
-        setTimeout(() => {
-          playOpponentTts(dynamicOpponent);
-        }, 150);
-      }
+    } catch (err: any) {
+      console.error('[Arena] Error sending argument:', err);
+      const errMsg = err?.message || (isVi ? 'Không thể gửi luận điểm. Vui lòng thử lại.' : 'Failed to send argument. Please retry.');
+      alert(errMsg);
     } finally {
       setIsLoading(false);
     }
@@ -1086,19 +902,21 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
     return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
   };
 
-  // Color calculation for Neural Score Ring
-  const getScoreColor = (score: number) => {
+  // Color calculation for Neural Score Ring (INVARIANT-SCORE-02, INVARIANT-SCORE-04)
+  const getScoreColor = (score: number | null) => {
+    if (score === null) return { stroke: '#94a3b8', text: 'text-slate-500 dark:text-slate-400', bg: 'bg-slate-50 dark:bg-slate-500/10', border: 'border-slate-200 dark:border-slate-500/30' };
     if (score >= 8.0) return { stroke: '#10b981', text: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-200 dark:border-emerald-500/30' };
     if (score >= 6.0) return { stroke: '#f59e0b', text: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-500/10', border: 'border-amber-200 dark:border-amber-500/30' };
     return { stroke: '#f43f5e', text: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-500/10', border: 'border-rose-200 dark:border-rose-500/30' };
   };
 
-  const scoreTheme = currentTurnData ? getScoreColor(currentTurnData.logicScore) : getScoreColor(7.8);
+  const scoreTheme = currentTurnData ? getScoreColor(currentTurnData.logicScore) : getScoreColor(null);
 
-  // Overall average score calculation for match summary
-  const averageScore = turns.length > 0
-    ? +(turns.reduce((acc, t) => acc + t.logicScore, 0) / turns.length).toFixed(1)
-    : 8.0;
+  // Overall average score calculation for match summary (INVARIANT-SCORE-02)
+  const scoredTurns = turns.filter((t) => typeof t.logicScore === 'number' && Number.isFinite(t.logicScore));
+  const averageScore = scoredTurns.length > 0
+    ? +(scoredTurns.reduce((acc, t) => acc + (t.logicScore as number), 0) / scoredTurns.length).toFixed(1)
+    : null;
 
   const voiceTurns = turns.filter((t) => t.wpm != null);
   const hasVoiceTurns = voiceTurns.length > 0;
@@ -1865,7 +1683,13 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
                   <div>
                     <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">{isVi ? `Điểm Đánh Giá C-R-E (Lượt ${currentTurnData.turnNumber})` : `C-R-E Evaluation Score (Turn ${currentTurnData.turnNumber})`}</div>
                     <div className={`text-2xl font-black font-mono mt-0.5 ${scoreTheme.text}`}>
-                      {currentTurnData.logicScore.toFixed(1)} <span className="text-xs font-sans text-slate-500 dark:text-slate-400 font-normal">/ 10.0</span>
+                      {currentTurnData.logicScore !== null ? (
+                        <>
+                          {currentTurnData.logicScore.toFixed(1)} <span className="text-xs font-sans text-slate-500 dark:text-slate-400 font-normal">/ 10.0</span>
+                        </>
+                      ) : (
+                        <span className="text-sm font-sans text-slate-400 dark:text-slate-500 font-normal">{isVi ? 'Không có điểm' : 'N/A'}</span>
+                      )}
                     </div>
                   </div>
 
@@ -1882,14 +1706,14 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
                       <path
                         stroke={scoreTheme.stroke}
                         strokeWidth="3.5"
-                        strokeDasharray={`${Math.round(currentTurnData.logicScore * 10)}, 100`}
+                        strokeDasharray={currentTurnData.logicScore !== null ? `${Math.round(currentTurnData.logicScore * 10)}, 100` : '0, 100'}
                         strokeLinecap="round"
                         fill="none"
                         d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                       />
                     </svg>
                     <span className={`absolute text-xs font-bold font-mono ${scoreTheme.text}`}>
-                      {Math.round(currentTurnData.logicScore * 10)}%
+                      {currentTurnData.logicScore !== null ? `${Math.round(currentTurnData.logicScore * 10)}%` : '--'}
                     </span>
                   </div>
                 </div>
@@ -2062,7 +1886,13 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
               <div className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-500/30 text-center">
                 <div className="text-[10px] font-bold uppercase text-indigo-600 dark:text-indigo-400">{isVi ? 'Điểm C-R-E Trung Bình' : 'Average C-R-E Score'}</div>
                 <div className="text-2xl font-black font-mono text-indigo-700 dark:text-indigo-300 mt-1">
-                  {averageScore.toFixed(1)} <span className="text-xs font-normal text-slate-500">/ 10</span>
+                  {averageScore !== null ? (
+                    <>
+                      {averageScore.toFixed(1)} <span className="text-xs font-normal text-slate-500">/ 10</span>
+                    </>
+                  ) : (
+                    <span className="text-sm font-normal text-slate-400">{isVi ? 'N/A' : 'N/A'}</span>
+                  )}
                 </div>
               </div>
 

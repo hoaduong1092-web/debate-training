@@ -203,17 +203,25 @@ function LearningModal({ detail, t, language, onClose }: LearningModalProps) {
             <div className={`px-3 py-1.5 rounded-xl font-mono font-black text-base md:text-lg border ${getScoreBadgeClass(session.overall_score)}`}>
               {session.overall_score}
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
-              <span className="px-2.5 py-1 rounded-lg bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                Nội dung: {session.content_score}
-              </span>
-              <span className="px-2.5 py-1 rounded-lg bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                Phong thái: {session.style_score}
-              </span>
-              <span className="px-2.5 py-1 rounded-lg bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                Chiến lược: {session.strategy_score}
-              </span>
-            </div>
+            {(session.content_score != null || session.style_score != null || session.strategy_score != null) && (
+              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+                {session.content_score != null && (
+                  <span className="px-2.5 py-1 rounded-lg bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                    Nội dung: {session.content_score}
+                  </span>
+                )}
+                {session.style_score != null && (
+                  <span className="px-2.5 py-1 rounded-lg bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                    Phong thái: {session.style_score}
+                  </span>
+                )}
+                {session.strategy_score != null && (
+                  <span className="px-2.5 py-1 rounded-lg bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                    Chiến lược: {session.strategy_score}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2 text-xs">

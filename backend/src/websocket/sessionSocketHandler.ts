@@ -27,9 +27,11 @@ export class SessionSocketHandler {
   }
 
   /**
-   * Broadcasts eviction to all instances via Redis Pub/Sub
+   * Broadcasts eviction to all instances via Redis Pub/Sub and triggers local eviction immediately
    */
-  static notifyGentleEviction(oldSessionId: string, newSessionId: string): void {
+  static notifyGentleEviction(oldSession: string | { sessionId: string }, newSessionId: string): void {
+    const oldSessionId = typeof oldSession === 'string' ? oldSession : oldSession.sessionId;
+    this.triggerLocalEviction(oldSessionId, newSessionId);
     redisClient.publish('session_eviction', JSON.stringify({ oldSessionId, newSessionId }))
       .catch(err => console.error('[WS Eviction] Failed to publish', err));
   }
