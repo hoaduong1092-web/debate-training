@@ -190,7 +190,7 @@ export async function createOpenAIChatCompletion(
 
   if (!apiKey) {
     throw new Error(
-      'No AI API key configured. Set BEEKNOEE_API_KEY or OPENAI_API_KEY in .env.local or .env.',
+      'No AI API key configured. Set BEEKNOEE_API_KEY or OPENAI_API_KEY in .env.',
     );
   }
 
@@ -241,7 +241,7 @@ export async function createOpenAIChatCompletion(
         model,
         detail: detail.slice(0, 300),
         hint: response.status === 401
-          ? 'API key invalid — check BEEKNOEE_API_KEY in .env.local'
+          ? 'API key invalid — check BEEKNOEE_API_KEY in .env'
           : response.status === 404
           ? `Model "${model}" not found on ${baseUrl}`
           : response.status === 429

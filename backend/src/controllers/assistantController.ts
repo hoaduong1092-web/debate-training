@@ -151,7 +151,25 @@ export async function createSpeechDraft(req: AuthRequest, res: Response): Promis
       return;
     }
 
-    // 6. Schema validation — null return triggers zero-deduction path.
+    // 6. Detect upstream billing / insufficient balance errors before parsing.
+    //    Beeknoee gateway returns a human-readable error text (not JSON) when credits run out.
+    if (
+      aiContent &&
+      (aiContent.includes('Số dư tài khoản API không đủ') ||
+       aiContent.includes('insufficient') ||
+       aiContent.includes('billing') ||
+       aiContent.includes('Nạp thêm tại'))
+    ) {
+      console.warn('[ASSISTANT] AI provider billing error detected. Raw preview:', aiContent.slice(0, 300));
+      res.status(502).json({
+        success: false,
+        error: 'AI_BILLING_ERROR',
+        message: 'Hệ thống AI tạm thời không khả dụng do vấn đề cấu hình. Vui lòng thử lại sau hoặc liên hệ quản trị viên.',
+      });
+      return;
+    }
+
+    // 7. Schema validation — null return triggers zero-deduction path.
     const artifact = parseSpeechDraft(aiContent);
     if (!artifact) {
       console.warn('[ASSISTANT_RAW_FAILED] Speech Draft parser returned null. Raw output preview:',
@@ -261,7 +279,24 @@ export async function createMotionAnalysis(req: AuthRequest, res: Response): Pro
       return;
     }
 
-    // 6. Schema validation.
+    // 6. Detect upstream billing / insufficient balance errors before parsing.
+    if (
+      aiContent &&
+      (aiContent.includes('Số dư tài khoản API không đủ') ||
+       aiContent.includes('insufficient') ||
+       aiContent.includes('billing') ||
+       aiContent.includes('Nạp thêm tại'))
+    ) {
+      console.warn('[ASSISTANT] AI provider billing error detected (Motion). Raw preview:', aiContent.slice(0, 300));
+      res.status(502).json({
+        success: false,
+        error: 'AI_BILLING_ERROR',
+        message: 'Hệ thống AI tạm thời không khả dụng do vấn đề cấu hình. Vui lòng thử lại sau hoặc liên hệ quản trị viên.',
+      });
+      return;
+    }
+
+    // 7. Schema validation.
     const artifact = parseMotionAnalysis(aiContent);
     if (!artifact) {
       console.warn('[ASSISTANT_RAW_FAILED] Motion Analysis parser returned null. Raw output preview:',

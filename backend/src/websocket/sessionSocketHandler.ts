@@ -1,12 +1,45 @@
 import { WebSocket } from 'ws';
-import { ActiveSession } from '../services/sessionRegistry';
+import { SessionRegistry } from '../services/sessionRegistry';
+import { redisClient, redisSubscriber } from '../infrastructure/redis/redisClient';
 
 export class SessionSocketHandler {
+  static initSubscriber() {
+    redisSubscriber.subscribe('session_eviction', (err) => {
+      if (err) {
+        if (process.env.NODE_ENV === 'production') {
+          console.error('[WS Eviction] Failed to subscribe to Redis channel', err);
+        } else {
+          console.warn('[WS Eviction] Pub/Sub subscription pending Redis connection.');
+        }
+      }
+    });
+
+    redisSubscriber.on('message', (channel, message) => {
+      if (channel === 'session_eviction') {
+        try {
+          const { oldSessionId, newSessionId } = JSON.parse(message);
+          this.triggerLocalEviction(oldSessionId, newSessionId);
+        } catch (e) {
+          console.error('[WS Eviction] Failed to parse message', e);
+        }
+      }
+    });
+  }
+
   /**
-   * Gửi thông báo SESSION_REPLACED tới thiết bị cũ một cách êm thuận (Gentle Drain)
+   * Broadcasts eviction to all instances via Redis Pub/Sub
    */
-  static notifyGentleEviction(oldSession: ActiveSession, newSessionId: string): void {
-    if (oldSession.socket && oldSession.socket.readyState === WebSocket.OPEN) {
+  static notifyGentleEviction(oldSessionId: string, newSessionId: string): void {
+    redisClient.publish('session_eviction', JSON.stringify({ oldSessionId, newSessionId }))
+      .catch(err => console.error('[WS Eviction] Failed to publish', err));
+  }
+
+  /**
+   * Handles local eviction logic if the socket is connected to this instance
+   */
+  private static triggerLocalEviction(oldSessionId: string, newSessionId: string): void {
+    const socket = SessionRegistry.getLocalSocket(oldSessionId);
+    if (socket && socket.readyState === WebSocket.OPEN) {
       const evictionPayload = JSON.stringify({
         type: 'SESSION_REPLACED',
         event: 'GENTLE_EVICTION',
@@ -16,12 +49,13 @@ export class SessionSocketHandler {
       });
 
       try {
-        oldSession.socket.send(evictionPayload);
+        socket.send(evictionPayload);
         // Đóng socket sau khi đã gửi thông điệp êm dịu (Gentle Drain 500ms)
         setTimeout(() => {
-          if (oldSession.socket && oldSession.socket.readyState === WebSocket.OPEN) {
-            oldSession.socket.close(4001, 'SESSION_REPLACED');
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.close(4001, 'SESSION_REPLACED');
           }
+          SessionRegistry.removeLocalSocket(oldSessionId);
         }, 500);
       } catch (err) {
         console.error('[WS Eviction] Error notifying old session:', err);

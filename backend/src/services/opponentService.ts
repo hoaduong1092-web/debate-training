@@ -132,6 +132,7 @@ export async function generateOpponentResponse(
   const aiResult = await executeWithMetering({
     userId: input.userId,
     sessionId: input.sessionId,
+    turnNumber: input.turnNumber,
     serviceType: 'LLM_OPPONENT',
     modelName: OPPONENT_MODEL,
     taskName: 'Opponent_Rebuttal',

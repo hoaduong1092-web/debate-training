@@ -1,3 +1,5 @@
+import { redisClient } from '../infrastructure/redis/redisClient';
+import { redisKeys } from '../infrastructure/redis/redisKeys';
 import { WebSocket } from 'ws';
 
 export interface ActiveSession {
@@ -8,67 +10,79 @@ export interface ActiveSession {
 }
 
 export class SessionRegistry {
-  private static sessions = new Map<string, ActiveSession>();
+  // Local process memory for WebSocket connection objects ONLY
+  private static localSockets = new Map<string, WebSocket>();
 
   /**
-   * Đăng ký hoặc ghi đè phiên hoạt động cho User.
-   * Nếu có phiên cũ, trả về thông tin phiên cũ để kích hoạt Gentle Eviction.
+   * Đăng ký hoặc ghi đè phiên hoạt động cho User trong Redis.
+   * Nếu có phiên cũ, trả về sessionId cũ để kích hoạt Gentle Eviction.
    */
-  static registerSession(userId: string, sessionId: string, socket: WebSocket | null = null): ActiveSession | null {
-    const oldSession = this.sessions.get(userId) || null;
+  static async registerSession(userId: string, sessionId: string): Promise<string | null> {
+    const key = redisKeys.activeSession(userId);
+    const oldSessionId = await redisClient.get(key);
     
-    this.sessions.set(userId, {
-      userId,
-      sessionId,
-      socket,
-      updatedAt: Date.now(),
-    });
+    // Set active session in Redis with 30d expiry to match token
+    await redisClient.set(key, sessionId, 'EX', 30 * 24 * 60 * 60);
 
-    return oldSession && oldSession.sessionId !== sessionId ? oldSession : null;
+    return oldSessionId && oldSessionId !== sessionId ? oldSessionId : null;
   }
 
   /**
-   * Cập nhật WebSocket connection cho session hiện tại
+   * Cập nhật WebSocket connection cho session hiện tại trong process local memory
    */
-  static bindSocket(userId: string, sessionId: string, socket: WebSocket): boolean {
-    const session = this.sessions.get(userId);
-    if (session && session.sessionId === sessionId) {
-      session.socket = socket;
-      return true;
-    }
-    return false;
+  static bindSocket(sessionId: string, socket: WebSocket): boolean {
+    this.localSockets.set(sessionId, socket);
+    return true;
   }
 
   /**
-   * Kiểm tra session có phải là phiên hoạt động duy nhất hợp lệ
+   * Lấy local socket (nếu có) của một sessionId
    */
-  static isActiveSession(userId: string, sessionId: string): boolean {
-    const session = this.sessions.get(userId);
-    if (!session) return true; // Nếu chưa có bản ghi (dev/cold start), cho phép fallback hợp lệ
-    return session.sessionId === sessionId;
+  static getLocalSocket(sessionId: string): WebSocket | undefined {
+    return this.localSockets.get(sessionId);
   }
 
   /**
-   * Lấy sessionId đang active của User
+   * Xóa local socket
    */
-  static getActiveSessionId(userId: string): string | null {
-    return this.sessions.get(userId)?.sessionId || null;
+  static removeLocalSocket(sessionId: string): void {
+    this.localSockets.delete(sessionId);
+  }
+
+  /**
+   * Kiểm tra session có phải là phiên hoạt động duy nhất hợp lệ không (Redis check)
+   */
+  static async isActiveSession(userId: string, sessionId: string): Promise<boolean> {
+    const key = redisKeys.activeSession(userId);
+    const activeSessionId = await redisClient.get(key);
+    if (!activeSessionId) return true; // Nếu chưa có bản ghi (e.g. dev or cleared), cho phép
+    return activeSessionId === sessionId;
   }
 
   /**
    * Xóa phiên hoạt động khi đăng xuất
    */
-  static removeSession(userId: string, sessionId: string): void {
-    const session = this.sessions.get(userId);
-    if (session && session.sessionId === sessionId) {
-      this.sessions.delete(userId);
+  static async removeSession(userId: string, sessionId: string): Promise<void> {
+    const key = redisKeys.activeSession(userId);
+    const activeSessionId = await redisClient.get(key);
+    if (activeSessionId === sessionId) {
+      await redisClient.del(key);
     }
+  }
+
+  /**
+   * Lấy sessionId đang active của User
+   */
+  static async getActiveSessionId(userId: string): Promise<string | null> {
+    const key = redisKeys.activeSession(userId);
+    return await redisClient.get(key);
   }
 
   /**
    * Reset registry (dùng cho unit test)
    */
-  static clear(): void {
-    this.sessions.clear();
+  static async clear(userId: string): Promise<void> {
+    const key = redisKeys.activeSession(userId);
+    await redisClient.del(key);
   }
 }

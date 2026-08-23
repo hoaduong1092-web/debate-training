@@ -14,6 +14,7 @@ import { getGatewayName } from './openAICompatibleClient';
 export interface AICallParams {
   userId: string;
   sessionId: string;
+  turnNumber?: number;
   serviceType: string;
   modelName: string;
   taskName: string;
@@ -52,6 +53,7 @@ export async function executeWithMetering(params: AICallParams) {
       if (gateway === 'beeknoee') {
         pricingVersion = 'v1-antigravity';
         pricingSource = 'beeknoee-gateway';
+        // Mock token logic for custom gateways if needed
       } else {
         const cost = calculateEstimatedCost(params.modelName, inputTokens, outputTokens);
         pricingVersion = cost.pricingVersion;
@@ -60,6 +62,26 @@ export async function executeWithMetering(params: AICallParams) {
       }
 
       console.log(`[Telemetry] task=${params.taskName} model=${params.modelName} inTokens=${inputTokens} outTokens=${outputTokens} costUsd=${estimatedCostUsd} ms=${executionMs} gateway=${pricingSource}`);
+
+      // Persist to UsageLog
+      try {
+        const { PrismaClient } = require('@prisma/client');
+        const prisma = new PrismaClient();
+        await prisma.usageLog.create({
+          data: {
+            sessionId: params.sessionId,
+            turnNumber: params.turnNumber ?? 0,
+            model: params.modelName,
+            promptTokens: inputTokens,
+            completionTokens: outputTokens,
+            totalTokens: inputTokens + outputTokens,
+            costUsd: estimatedCostUsd || 0,
+            latencyMs: executionMs,
+          },
+        });
+      } catch (e) {
+        console.error('[UsageLog] Failed to persist telemetry:', e);
+      }
     }
   }
 

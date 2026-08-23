@@ -42,21 +42,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const DEMO_USER: AuthUser = {
-  id: "22222222-2222-2222-2222-222222222222",
-  phoneNumber: "+84901234567",
-  full_name: "Học Viên Mẫu",
-  displayName: "Học Viên Mẫu",
-  role: "STUDENT",
-  plan: "STANDARD",
-  credits: 10,
-  quota: {
-    textTurnsRemaining: 20,
-    voiceMinsRemaining: 15,
-    assistantRemaining: 10,
-    lastResetAt: new Date().toISOString(),
-  },
-};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -72,7 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setTokenState(null);
     setSessionIdState(null);
     localStorage.removeItem("auth_user");
-    setUser(DEMO_USER);
+    setUser(null);
   }, []);
 
   const logout = useCallback(() => {
@@ -86,7 +71,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setTokenState(null);
     setSessionIdState(null);
     localStorage.removeItem("auth_user");
-    setUser(DEMO_USER);
+    setUser(null);
     setIsEvicted(false);
   }, []);
 
@@ -106,12 +91,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const storedSession = getStoredSessionId();
     const storedUser = localStorage.getItem("auth_user");
 
-    let initialUser: AuthUser = DEMO_USER;
+    let initialUser: AuthUser | null = null;
     if (storedUser) {
       try {
-        initialUser = { ...DEMO_USER, ...JSON.parse(storedUser) };
+        initialUser = JSON.parse(storedUser);
       } catch {
-        initialUser = DEMO_USER;
+        initialUser = null;
       }
     }
 
@@ -123,24 +108,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(false);
 
     // Sync latest user profile directly from server
-    fetchUserProfile()
-      .then((resp) => {
-        if (resp && resp.profile) {
-          setUser((prev) => {
-            const current = prev || initialUser;
-            const name = resp.profile.display_name || resp.profile.full_name || current.displayName || current.full_name;
-            const updated: AuthUser = {
-              ...current,
-              id: resp.profile.id || current.id,
-              displayName: name,
-              full_name: name,
-            };
-            localStorage.setItem("auth_user", JSON.stringify(updated));
-            return updated;
-          });
-        }
-      })
-      .catch(() => {});
+    if (storedToken && initialUser) {
+      fetchUserProfile()
+        .then((resp) => {
+          if (resp && resp.profile) {
+            setUser((prev) => {
+              const current = prev || initialUser;
+              if (!current) return null;
+              const name = resp.profile.display_name || resp.profile.full_name || current.displayName || current.full_name;
+              const updated: AuthUser = {
+                ...current,
+                id: resp.profile.id || current.id,
+                displayName: name,
+                full_name: name,
+              };
+              localStorage.setItem("auth_user", JSON.stringify(updated));
+              return updated;
+            });
+          }
+        })
+        .catch(() => {});
+    }
   }, []);
 
   // Listen to API 401 SESSION_REVOKED events
@@ -153,7 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Connect WebSocket to listen for SESSION_REPLACED event
   useEffect(() => {
-    if (!token || !sessionId || user?.id === DEMO_USER.id) {
+    if (!token || !sessionId) {
       return;
     }
 
@@ -210,8 +198,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateDisplayName = useCallback((name: string) => {
     setUser((prev) => {
-      const base = prev || DEMO_USER;
-      const updated: AuthUser = { ...base, displayName: name, full_name: name };
+      if (!prev) return null;
+      const updated: AuthUser = { ...prev, displayName: name, full_name: name };
       localStorage.setItem("auth_user", JSON.stringify(updated));
       return updated;
     });
@@ -256,22 +244,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // Fallback: sync via fetchUserProfile()
-    try {
-      const resp = await fetchUserProfile();
-      if (resp && resp.profile) {
-        setUser((prev) => {
-          const base = prev || DEMO_USER;
-          const name = resp.profile.display_name || resp.profile.full_name || base.displayName || base.full_name;
-          const updated: AuthUser = {
-            ...base,
-            displayName: name,
-            full_name: name,
-          };
-          localStorage.setItem("auth_user", JSON.stringify(updated));
-          return updated;
-        });
-      }
-    } catch {}
+    if (currentToken) {
+      try {
+        const resp = await fetchUserProfile();
+        if (resp && resp.profile) {
+          setUser((prev) => {
+            if (!prev) return null;
+            const name = resp.profile.display_name || resp.profile.full_name || prev.displayName || prev.full_name;
+            const updated: AuthUser = {
+              ...prev,
+              displayName: name,
+              full_name: name,
+            };
+            localStorage.setItem("auth_user", JSON.stringify(updated));
+            return updated;
+          });
+        }
+      } catch {}
+    }
   }, []);
 
   return (

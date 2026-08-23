@@ -198,16 +198,20 @@ export async function createDebateSession(req: Request, res: Response) {
 
     // ── TEXT MODE FLOW (Consumes exactly 1 TEXT_DEBATE credit) ───────────────
     let quotaResult = await consumeQuota(userId, 'TEXT_DEBATE', 1);
+    
+    // DEMO AUTO-REFILL is strictly forbidden in production
     if (quotaResult.decision !== 'ALLOW' && userId === DEMO_USER_ID) {
-      try {
-        await prisma.userQuota.upsert({
-          where: { userId },
-          update: { textTurnsRemaining: 50, voiceMinsRemaining: 30, assistantRemaining: 20 },
-          create: { userId, textTurnsRemaining: 50, voiceMinsRemaining: 30, assistantRemaining: 20 },
-        });
-        quotaResult = await consumeQuota(userId, 'TEXT_DEBATE', 1);
-      } catch (e) {
-        console.warn('[DEMO_QUOTA_RESET_WARN]', e);
+      if (process.env.NODE_ENV !== 'production' && process.env.ENABLE_DEMO === 'true') {
+        try {
+          await prisma.userQuota.upsert({
+            where: { userId },
+            update: { textTurnsRemaining: 50, voiceMinsRemaining: 30, assistantRemaining: 20 },
+            create: { userId, textTurnsRemaining: 50, voiceMinsRemaining: 30, assistantRemaining: 20 },
+          });
+          quotaResult = await consumeQuota(userId, 'TEXT_DEBATE', 1);
+        } catch (e) {
+          console.warn('[DEMO_QUOTA_RESET_WARN]', e);
+        }
       }
     }
 
@@ -394,6 +398,7 @@ export async function handleDebateMessage(req: Request, res: Response) {
         return executeWithMetering({
           userId,
           sessionId,
+          turnNumber: userTurnNumber,
           serviceType: 'LLM_COACH',
           modelName: LOGIC_COACH_MODEL,
           taskName: 'Logic_Coach_Analysis',
@@ -627,9 +632,12 @@ export async function handleDebateMessage(req: Request, res: Response) {
 
 export async function listUserSessions(req: Request, res: Response): Promise<void> {
   try {
-    const queryUserId = String(req.query['userId'] ?? '').trim();
     const authUserId = (req as { userId?: string }).userId;
-    const userId = queryUserId || authUserId || DEMO_USER_ID;
+    if (!authUserId) {
+      res.status(401).json({ success: false, error: 'Unauthorized' });
+      return;
+    }
+    const userId = authUserId;
 
     const rawLimit = parseInt(String(req.query['limit'] ?? '20'), 10);
     const rawOffset = parseInt(String(req.query['offset'] ?? '0'), 10);

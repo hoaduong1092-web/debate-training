@@ -99,8 +99,29 @@ function startVoiceStudioProcess() {
 }
 startVoiceStudioProcess();
 
-app.listen(PORT, () => {
+import { createSessionWebSocketServer, handleSessionUpgrade } from './websocket/sessionWebSocketServer';
+import { SessionSocketHandler } from './websocket/sessionSocketHandler';
+import { parse } from 'url';
+
+const server = app.listen(PORT, () => {
   console.log(`AI Debate Master Backend running on port ${PORT}`);
+  
+  // Initialize Redis Pub/Sub for cross-instance Gentle Eviction
+  SessionSocketHandler.initSubscriber();
+});
+
+const sessionWss = createSessionWebSocketServer();
+
+server.on('upgrade', (request, socket, head) => {
+  const { pathname } = parse(request.url || '');
+
+  if (pathname === '/ws') {
+    handleSessionUpgrade(sessionWss, request, socket, head);
+  } else {
+    // If not handled, destroy
+    // Note: Voice WebSocket on port 4001 handles its own upgrades natively because it's a separate server.
+    socket.destroy();
+  }
 });
 
 // Start Voice Coach WebSocket server on separate port.

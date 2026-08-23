@@ -1,14 +1,13 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
 import { PhoneValidator } from '../utils/phoneValidator';
 import { OtpService } from '../services/otpService';
 import { SessionRegistry } from '../services/sessionRegistry';
 import { SessionSocketHandler } from '../websocket/sessionSocketHandler';
+import { generateToken } from '../middleware/auth';
 
 const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || 'ai-debate-master-jwt-secret-v15';
 
 export class AuthController {
   static async requestOtp(req: Request, res: Response): Promise<void> {
@@ -21,7 +20,7 @@ export class AuthController {
         return;
       }
 
-      const result = OtpService.generateOtp(normalizedPhone);
+      const result = await OtpService.generateOtp(normalizedPhone);
       if (!result.success) {
         res.status(429).json({ success: false, error: result.message, cooldownRemaining: result.cooldownRemaining });
         return;
@@ -48,7 +47,7 @@ export class AuthController {
         return;
       }
 
-      const verifyResult = OtpService.verifyOtp(normalizedPhone, otp);
+      const verifyResult = await OtpService.verifyOtp(normalizedPhone, otp);
       if (!verifyResult.success) {
         res.status(400).json({ success: false, error: verifyResult.message });
         return;
@@ -81,20 +80,12 @@ export class AuthController {
       const sessionId = randomUUID();
 
       // Register new active session and trigger Gentle Eviction for any existing session
-      const oldSession = SessionRegistry.registerSession(user.id, sessionId);
-      if (oldSession) {
-        SessionSocketHandler.notifyGentleEviction(oldSession, sessionId);
+      const oldSessionId = await SessionRegistry.registerSession(user.id, sessionId);
+      if (oldSessionId) {
+        SessionSocketHandler.notifyGentleEviction(oldSessionId, sessionId);
       }
 
-      const token = jwt.sign(
-        {
-          userId: user.id,
-          phoneNumber: user.phoneNumber,
-          sessionId,
-        },
-        JWT_SECRET,
-        { expiresIn: '30d' }
-      );
+      const token = generateToken(user.id, user.phoneNumber, sessionId);
 
       res.status(200).json({
         success: true,

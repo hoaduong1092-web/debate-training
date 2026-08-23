@@ -1,14 +1,14 @@
 import OpenAI from "openai";
 import * as dotenv from "dotenv";
 
-dotenv.config({ path: ".env.local" });
+dotenv.config({ path: ".env" });
 
 const apiKey = process.env.BEEKNOEE_API_KEY;
 const baseURL = process.env.BEEKNOEE_BASE_URL || "https://platform.beeknoee.com/api/v1";
 const model = process.env.MODEL_LOGIC_COACH || "claude-sonnet-4-6";
 
 if (!apiKey) {
-  console.error("❌ Lỗi: Chưa tìm thấy BEEKNOEE_API_KEY trong file .env.local");
+  console.error("❌ Lỗi: Chưa tìm thấy BEEKNOEE_API_KEY trong file .env");
   process.exit(1);
 }
 

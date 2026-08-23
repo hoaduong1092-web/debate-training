@@ -2,7 +2,14 @@ import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
 import { SessionRegistry } from "../services/sessionRegistry";
 
-const JWT_SECRET = process.env.JWT_SECRET ?? "ai-debate-master-jwt-secret-v15";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (process.env.NODE_ENV === 'production' && !JWT_SECRET) {
+  console.error("FATAL: JWT_SECRET is mandatory in production.");
+  process.exit(1);
+}
+export const ACTUAL_JWT_SECRET = JWT_SECRET || "ai-debate-master-jwt-secret-v15";
+const JWT_EXPIRES = process.env.JWT_EXPIRES || "30d";
+
 export const DEMO_USER_ID = "22222222-2222-2222-2222-222222222222";
 
 export interface AuthRequest extends Request {
@@ -17,6 +24,16 @@ export interface AuthRequest extends Request {
     sessionId?: string;
   };
 }
+
+const applyDemoFallback = (req: Request, next: NextFunction) => {
+  if (process.env.NODE_ENV !== 'production' && process.env.ENABLE_DEMO === 'true') {
+    (req as AuthRequest).userId = DEMO_USER_ID;
+    (req as AuthRequest).isDemo = true;
+    next();
+  } else {
+    next(new Error('Unauthorized')); // Signal to return 401
+  }
+};
 
 /**
  * Strict authentication middleware — checks Bearer token, returns 401 if missing/invalid,
@@ -38,14 +55,15 @@ export const authenticateToken = async (
     const token = authHeader.startsWith("Bearer ")
       ? authHeader.slice(7)
       : authHeader;
-    const decoded = jwt.verify(token, JWT_SECRET) as {
+    const decoded = jwt.verify(token, ACTUAL_JWT_SECRET) as {
       userId: string;
       phoneNumber?: string;
       sessionId?: string;
     };
 
     // Enforce Active Session
-    if (decoded.sessionId && !SessionRegistry.isActiveSession(decoded.userId, decoded.sessionId)) {
+    const isActive = await SessionRegistry.isActiveSession(decoded.userId, decoded.sessionId || '');
+    if (decoded.sessionId && !isActive) {
       res.status(401).json({
         success: false,
         error: "Phiên đăng nhập đã hết hiệu lực do có thiết bị khác đăng nhập.",
@@ -65,22 +83,25 @@ export const authenticateToken = async (
 };
 
 /**
- * authenticate middleware — dual-mode:
- *  - No Authorization header  → fallback to DEMO_USER_ID (backward compatible)
- *  - Bearer <jwt>             → verify & extract userId & session
- *  - Invalid token            → fallback to DEMO_USER_ID (graceful degradation)
+ * authenticate middleware
+ * In production: strictly calls authenticateToken (NO fallback).
+ * In development (with ENABLE_DEMO=true): allows fallback to DEMO_USER_ID if no token/invalid token.
  */
 export const authenticate = async (
   req: Request,
-  _res: Response,
+  res: Response,
   next: NextFunction,
 ): Promise<void> => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
-    (req as AuthRequest).userId = DEMO_USER_ID;
-    (req as AuthRequest).isDemo = true;
-    next();
+    if (process.env.NODE_ENV !== 'production' && process.env.ENABLE_DEMO === 'true') {
+      (req as AuthRequest).userId = DEMO_USER_ID;
+      (req as AuthRequest).isDemo = true;
+      next();
+      return;
+    }
+    res.status(401).json({ success: false, error: "Chưa xác thực. Thiếu Authorization header." });
     return;
   }
 
@@ -88,12 +109,24 @@ export const authenticate = async (
     const token = authHeader.startsWith("Bearer ")
       ? authHeader.slice(7)
       : authHeader;
-    const decoded = jwt.verify(token, JWT_SECRET) as {
+    const decoded = jwt.verify(token, ACTUAL_JWT_SECRET) as {
       userId: string;
       phoneNumber?: string;
       email?: string;
       sessionId?: string;
     };
+    
+    // Enforce Active Session
+    const isActive = await SessionRegistry.isActiveSession(decoded.userId, decoded.sessionId || '');
+    if (decoded.sessionId && !isActive) {
+      res.status(401).json({
+        success: false,
+        error: "Phiên đăng nhập đã hết hiệu lực do có thiết bị khác đăng nhập.",
+        code: "SESSION_REVOKED",
+      });
+      return;
+    }
+
     (req as AuthRequest).userId = decoded.userId;
     (req as AuthRequest).userEmail = decoded.email;
     (req as AuthRequest).phoneNumber = decoded.phoneNumber;
@@ -102,15 +135,18 @@ export const authenticate = async (
     (req as AuthRequest).isDemo = false;
     next();
   } catch {
-    // Invalid / expired token → graceful fallback to demo
-    (req as AuthRequest).userId = DEMO_USER_ID;
-    (req as AuthRequest).isDemo = true;
-    next();
+    if (process.env.NODE_ENV !== 'production' && process.env.ENABLE_DEMO === 'true') {
+      (req as AuthRequest).userId = DEMO_USER_ID;
+      (req as AuthRequest).isDemo = true;
+      next();
+      return;
+    }
+    res.status(401).json({ success: false, error: "Token không hợp lệ hoặc đã hết hạn." });
   }
 };
 
 /**
- * Generate a signed JWT for a user. Expiry: 30 days.
+ * Generate a signed JWT for a user.
  */
 export const generateToken = (userId: string, phoneNumberOrEmail: string, sessionId?: string): string => {
   return jwt.sign(
@@ -120,7 +156,7 @@ export const generateToken = (userId: string, phoneNumberOrEmail: string, sessio
       email: !phoneNumberOrEmail.startsWith("+") ? phoneNumberOrEmail : undefined,
       sessionId,
     },
-    JWT_SECRET,
-    { expiresIn: "30d" }
+    ACTUAL_JWT_SECRET,
+    { expiresIn: JWT_EXPIRES }
   );
 };

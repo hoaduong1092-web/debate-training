@@ -210,7 +210,17 @@ export default function ProfileTab({
   const asstPct = Math.min(100, Math.max(0, Math.round((assistantRemaining / (assistantLimit || 10)) * 100)));
 
   const currentDisplayName = user?.displayName || user?.full_name || profile?.profile?.full_name || 'Học Viên Mẫu';
-  const badge = getPlanBadge(profile?.subscription?.plan ?? user?.plan, language);
+  const currentPlanId = (profile?.subscription?.plan ?? user?.plan ?? '').toUpperCase();
+  const badge = getPlanBadge(currentPlanId, language);
+  
+  let currentTier = 'FREE';
+  if (currentPlanId.includes('PREMIUM') || currentPlanId.includes('PRO')) {
+    currentTier = 'PREMIUM';
+  } else if (currentPlanId.includes('STD') || currentPlanId.includes('STANDARD')) {
+    currentTier = 'STANDARD';
+  } else if (currentPlanId.includes('BASIC')) {
+    currentTier = 'BASIC';
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-8 animate-fade-in text-slate-900 dark:text-slate-100">
@@ -663,7 +673,7 @@ export default function ProfileTab({
               onClick={() => setIsPricingModalOpen(true)}
               className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-xl text-xs transition cursor-pointer"
             >
-              {language === 'vi' ? 'Chọn Gói Này' : 'Select Plan'}
+              {currentTier === 'BASIC' ? (language === 'vi' ? 'Gói Hiện Tại' : 'Current Plan') : currentTier === 'FREE' ? (language === 'vi' ? 'Nâng Cấp Ngay' : 'Upgrade Now') : (language === 'vi' ? 'Hạ Cấp' : 'Downgrade')}
             </button>
           </div>
 
@@ -697,7 +707,7 @@ export default function ProfileTab({
               onClick={() => setIsPricingModalOpen(true)}
               className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition shadow-md shadow-indigo-600/30 cursor-pointer"
             >
-              {language === 'vi' ? 'Nâng Cấp Ngay' : 'Upgrade Now'}
+              {currentTier === 'STANDARD' ? (language === 'vi' ? 'Gói Hiện Tại' : 'Current Plan') : currentTier === 'PREMIUM' ? (language === 'vi' ? 'Hạ Cấp' : 'Downgrade') : (language === 'vi' ? 'Nâng Cấp Ngay' : 'Upgrade Now')}
             </button>
           </div>
 
@@ -728,7 +738,7 @@ export default function ProfileTab({
               onClick={() => setIsPricingModalOpen(true)}
               className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-xl text-xs transition cursor-pointer"
             >
-              {language === 'vi' ? 'Chọn Gói Này' : 'Select Plan'}
+              {currentTier === 'PREMIUM' ? (language === 'vi' ? 'Gói Hiện Tại' : 'Current Plan') : (language === 'vi' ? 'Nâng Cấp Ngay' : 'Upgrade Now')}
             </button>
           </div>
         </div>

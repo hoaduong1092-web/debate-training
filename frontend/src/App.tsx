@@ -4,7 +4,7 @@ import { Dashboard } from './components/Dashboard';
 import Login from './components/Login';
 
 export default function App() {
-  const { isLoading } = useAuth();
+  const { isLoading, isAuthenticated } = useAuth();
 
   if (isLoading) {
     return (
@@ -16,10 +16,10 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/arena" element={<Dashboard />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="*" element={<Navigate to="/arena" replace />} />
+      <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/arena" replace />} />
+      <Route path="/arena" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />} />
+      <Route path="/dashboard" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />} />
+      <Route path="*" element={<Navigate to={isAuthenticated ? "/arena" : "/login"} replace />} />
     </Routes>
   );
 }
