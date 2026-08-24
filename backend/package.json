@@ -6,8 +6,8 @@
   "type": "commonjs",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
+    "build": "prisma generate && tsc",
+    "start": "prisma db push --accept-data-loss && node dist/index.js",
     "voicestudio": "python voicestudio_service/server.py",
     "test:debate": "tsx src/testDebate.ts",
     "test:parser": "tsx src/logicCoachParser.test.ts",
