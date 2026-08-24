@@ -1,4 +1,4 @@
-import jwt from "jsonwebtoken";
+import jwt, { SignOptions } from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
 import { SessionRegistry } from "../services/sessionRegistry";
 
@@ -8,7 +8,7 @@ if (process.env.NODE_ENV === 'production' && !JWT_SECRET) {
   process.exit(1);
 }
 export const ACTUAL_JWT_SECRET = JWT_SECRET || "ai-debate-master-jwt-secret-v15";
-const JWT_EXPIRES = process.env.JWT_EXPIRES || "30d";
+const JWT_EXPIRES: SignOptions["expiresIn"] = (process.env.JWT_EXPIRES as SignOptions["expiresIn"]) || "30d";
 
 export const DEMO_USER_ID = "22222222-2222-2222-2222-222222222222";
 

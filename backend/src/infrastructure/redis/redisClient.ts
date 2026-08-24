@@ -1,4 +1,4 @@
-import Redis from 'ioredis';
+import Redis, { Callback } from 'ioredis';
 import { EventEmitter } from 'events';
 
 const redisUrl = process.env.REDIS_URL;
@@ -256,10 +256,14 @@ export class HybridRedisClient extends EventEmitter {
     return count || 1;
   }
 
-  subscribe(channel: string, cb?: (err: Error | null, count?: number) => void): this {
+  subscribe(channel: string, cb?: Callback): this {
     if (this.isRedisOnline && this.ioredis) {
       try {
-        this.ioredis.subscribe(channel, cb);
+        if (cb) {
+          this.ioredis.subscribe(channel, cb);
+        } else {
+          this.ioredis.subscribe(channel);
+        }
       } catch (err: any) {
         if (cb) cb(err);
       }

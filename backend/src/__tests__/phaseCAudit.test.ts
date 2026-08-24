@@ -187,24 +187,28 @@ async function runPhaseCAudit(): Promise<void> {
   const c18 = await transcribeBuffer(Buffer.from([]), 2000, 'vi');
   check('CASE 18', 'STT empty buffer returns empty transcript with reason', c18.transcript === '' && typeof c18.fallback_reason === 'string');
 
+  // Helper for rendering score safely without compiler never narrowing
+  const formatRenderScore = (score: number | null): string =>
+    score !== null ? `${score.toFixed(1)} / 10` : 'N/A';
+
   // CASE 19: Replay DB score = 0 -> Replay renders 0.0 / 10
   const replayScore0: number | null = 0;
-  const replayRender0 = replayScore0 !== null ? `${replayScore0.toFixed(1)} / 10` : 'N/A';
+  const replayRender0 = formatRenderScore(replayScore0);
   check('CASE 19', 'Replay DB score = 0 renders as "0.0 / 10"', replayRender0 === '0.0 / 10');
 
   // CASE 20: Replay DB score = null -> Replay renders N/A
   const replayScoreNull: number | null = null;
-  const replayRenderNull = replayScoreNull !== null ? `${replayScoreNull.toFixed(1)} / 10` : 'N/A';
+  const replayRenderNull = formatRenderScore(replayScoreNull);
   check('CASE 20', 'Replay DB score = null renders as "N/A"', replayRenderNull === 'N/A');
 
   // CASE 21: History score = 0 -> History renders 0.0 / 10
   const historyScore0: number | null = 0;
-  const historyRender0 = historyScore0 !== null ? `${historyScore0.toFixed(1)} / 10` : 'N/A';
+  const historyRender0 = formatRenderScore(historyScore0);
   check('CASE 21', 'History score = 0 renders as "0.0 / 10"', historyRender0 === '0.0 / 10');
 
   // CASE 22: History score = null -> History renders N/A
   const historyScoreNull: number | null = null;
-  const historyRenderNull = historyScoreNull !== null ? `${historyScoreNull.toFixed(1)} / 10` : 'N/A';
+  const historyRenderNull = formatRenderScore(historyScoreNull);
   check('CASE 22', 'History score = null renders as "N/A"', historyRenderNull === 'N/A');
 
   // CASE 23: Network timeout -> NO fake opponent, NO fake coach
