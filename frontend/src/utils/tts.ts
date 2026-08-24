@@ -10,6 +10,8 @@
  *    micro-pauses between utterances for natural debate delivery.
  *  - Safe interlock: stopSpeaking() is idempotent and always safe to call.
  *  - Graceful no-op when SpeechSynthesis is unavailable.
+ *  - Playback generation token: prevents stale async playback from restarting
+ *    after user presses Stop.
  */
 
 // ─── Browser Access ───────────────────────────────────────────────────────────
@@ -21,20 +23,102 @@ function getSynth(): SpeechSynthesis | null {
   return null;
 }
 
-// ─── Global Browser Audio Autoplay Unlocker ──────────────────────────────────
-if (typeof window !== 'undefined') {
-  const unlockAudio = () => {
+// ─── Reusable Mobile-Safe Audio Playback Pipeline ───────────────────────────
+let sharedAudioElement: HTMLAudioElement | null = null;
+let sharedAudioContext: AudioContext | null = null;
+let isAudioPipelineUnlocked = false;
+
+export function getOrCreateAudioElement(): HTMLAudioElement | null {
+  if (typeof window === 'undefined') return null;
+  if (!sharedAudioElement) {
     try {
-      const silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
-      silentAudio.play().catch(() => {});
+      sharedAudioElement = new Audio();
+      sharedAudioElement.preload = 'auto';
+      // Inline playback attribute for mobile Safari
+      sharedAudioElement.setAttribute('playsinline', 'true');
+      sharedAudioElement.setAttribute('webkit-playsinline', 'true');
     } catch {}
-    window.removeEventListener('click', unlockAudio);
-    window.removeEventListener('keydown', unlockAudio);
-    window.removeEventListener('touchstart', unlockAudio);
+  }
+  return sharedAudioElement;
+}
+
+export function getOrCreateAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null;
+  if (!sharedAudioContext) {
+    try {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (AudioCtx) {
+        sharedAudioContext = new AudioCtx();
+      }
+    } catch {}
+  }
+  return sharedAudioContext;
+}
+
+/**
+ * Returns whether the audio pipeline has been primed/unlocked by a user gesture.
+ */
+export function isAudioUnlocked(): boolean {
+  return isAudioPipelineUnlocked;
+}
+
+/**
+ * Unlock and prime the browser/mobile audio playback pipeline during a genuine user gesture.
+ * Must be called synchronously inside user touch/click handlers (e.g. tapping Mic, Start/Stop Recording, or switching to Voice Mode).
+ */
+export function unlockAudioPipeline(): void {
+  if (typeof window === 'undefined') return;
+
+  // 1. Prime persistent shared HTMLAudioElement with a 1-sample silent sound
+  const audio = getOrCreateAudioElement();
+  if (audio) {
+    try {
+      if (!audio.src || audio.src.startsWith('data:')) {
+        audio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              audio.pause();
+              isAudioPipelineUnlocked = true;
+            })
+            .catch(() => {});
+        }
+      }
+    } catch {}
+  }
+
+  // 2. Prime and resume shared AudioContext
+  const ctx = getOrCreateAudioContext();
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume().catch(() => {});
+  }
+
+  // 3. Pre-warm SpeechSynthesis on mobile browsers
+  const synth = getSynth();
+  if (synth) {
+    try {
+      if (synth.paused) synth.resume();
+      const silentUtter = new SpeechSynthesisUtterance('');
+      silentUtter.volume = 0;
+      synth.speak(silentUtter);
+      synth.cancel();
+    } catch {}
+  }
+
+  isAudioPipelineUnlocked = true;
+}
+
+// Global user interaction listener for initial passive unlock
+if (typeof window !== 'undefined') {
+  const globalInteractionHandler = () => {
+    unlockAudioPipeline();
   };
-  window.addEventListener('click', unlockAudio, { once: true });
-  window.addEventListener('keydown', unlockAudio, { once: true });
-  window.addEventListener('touchstart', unlockAudio, { once: true });
+  window.addEventListener('click', globalInteractionHandler, { capture: true, passive: true });
+  window.addEventListener('touchstart', globalInteractionHandler, { capture: true, passive: true });
+  window.addEventListener('keydown', globalInteractionHandler, { capture: true, passive: true });
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -237,43 +321,126 @@ export function splitIntoChunks(text: string): string[] {
   return chunks.length > 0 ? chunks : [text.trim()];
 }
 
-// ─── Chunked Sequential Speaker (Robust) ──────────────────────────────────────
+// ─── Playback Generation Token (Anti-Stale Playback) ─────────────────────────
 
-/** Inter-sentence pause in milliseconds for natural debate cadence. */
+/**
+ * Monotonically increasing generation counter.
+ * Incremented every time the user presses Stop or a new speech session begins.
+ * Any in-flight async operation checks this before starting audio —
+ * if the generation has changed, the playback attempt is silently dropped.
+ */
+let playbackGeneration = 0;
+
 // ─── Continuous Audio Streamer & Seamless SpeechSynthesis Fallback ────────────
 
 let currentAudioElement: HTMLAudioElement | null = null;
 let currentPlaySessionId = 0;
 
+// ─── Structured Diagnostics Telemetry ────────────────────────────────────────
+
+export interface VoiceDebateDiagnostics {
+  voiceModeActive: boolean;
+  opponentResponseReceived: boolean;
+  responseRole: string;
+  responseTextLength: number;
+  ttsAvailable: boolean;
+  speechSynthesisState: string;
+  audioUnlocked: boolean;
+  playbackStarted: boolean;
+  playbackError: string | null;
+}
+
+export function logVoiceDebateDiagnostics(diag: VoiceDebateDiagnostics): void {
+  console.info('[Voice Debate]', JSON.stringify({
+    voiceModeActive: diag.voiceModeActive,
+    opponentResponseReceived: diag.opponentResponseReceived,
+    responseRole: diag.responseRole,
+    responseTextLength: diag.responseTextLength,
+    ttsAvailable: diag.ttsAvailable,
+    speechSynthesisState: diag.speechSynthesisState,
+    audioUnlocked: diag.audioUnlocked,
+    playbackStarted: diag.playbackStarted,
+    playbackError: diag.playbackError,
+  }));
+}
+
 /**
- * Fast, natural browser SpeechSynthesis fallback (Google Tiếng Việt / Microsoft Hoài My).
- * Used when network TTS has high latency or server is unavailable.
+ * Fast, natural browser SpeechSynthesis fallback.
+ * Fix: Does NOT abort when getBestVoice returns null — sets utter.lang = 'vi-VN'
+ * and relies on the native OS speech synthesis engine.
  */
 function playSpeechSynthesisFallback(
   text: string,
   options: TTSOptions,
   sessionId: number,
+  generation: number,
 ): void {
+  // Check generation BEFORE starting — if user already pressed Stop, bail out
+  if (generation !== playbackGeneration) {
+    console.info('[TTS Source] Playback cancelled: generation mismatch (stop was pressed)');
+    options.onEnd?.();
+    return;
+  }
+
   const synth = getSynth();
   if (!synth) {
+    console.warn('[TTS Source] source=none | SpeechSynthesis unsupported');
+    logVoiceDebateDiagnostics({
+      voiceModeActive: true,
+      opponentResponseReceived: true,
+      responseRole: 'opponent',
+      responseTextLength: text.length,
+      ttsAvailable: false,
+      speechSynthesisState: 'unsupported',
+      audioUnlocked: isAudioPipelineUnlocked,
+      playbackStarted: false,
+      playbackError: 'SpeechSynthesis unsupported in browser environment',
+    });
     options.onEnd?.();
     return;
   }
 
   try {
     synth.cancel();
+    if (synth.paused) {
+      synth.resume();
+    }
+
     const targetLang = options.lang || 'vi-VN';
     const voice = getBestVoice(targetLang, options.gender || 'male');
-    if (!voice && targetLang === 'vi-VN') {
-      console.warn('[SpeechSynthesis] No Vietnamese voice installed in browser, skipping robotic fallback');
-      options.onEnd?.();
-      return;
-    }
     const utter = new SpeechSynthesisUtterance(text);
-    if (voice) utter.voice = voice;
+
+    // If matching Vietnamese / target voice exists, assign it;
+    // Otherwise DO NOT abort — allow the browser/platform OS TTS engine to resolve the language
+    if (voice) {
+      utter.voice = voice;
+      console.info(`[TTS Source] source=browser_speech_synthesis | voiceName=${voice.name} | lang=${voice.lang} | audioUrlPresent=false | fallbackReason=VoiceStudio_unavailable`);
+    } else {
+      console.info(`[TTS Source] source=browser_speech_synthesis | voiceName=OS_default | lang=${targetLang} | audioUrlPresent=false | fallbackReason=no_explicit_voice_found`);
+    }
     utter.lang = targetLang;
     utter.rate = options.rate || 1.0;
     utter.pitch = options.pitch || 1.0;
+    utter.volume = options.volume ?? 1.0;
+
+    utter.onstart = () => {
+      // Double-check generation — user may have pressed Stop between speak() call and actual start
+      if (generation !== playbackGeneration) {
+        synth.cancel();
+        return;
+      }
+      logVoiceDebateDiagnostics({
+        voiceModeActive: true,
+        opponentResponseReceived: true,
+        responseRole: 'opponent',
+        responseTextLength: text.length,
+        ttsAvailable: true,
+        speechSynthesisState: 'speaking',
+        audioUnlocked: isAudioPipelineUnlocked,
+        playbackStarted: true,
+        playbackError: null,
+      });
+    };
 
     utter.onend = () => {
       if (sessionId === currentPlaySessionId) {
@@ -282,66 +449,148 @@ function playSpeechSynthesisFallback(
     };
     utter.onerror = (e) => {
       console.warn('[SpeechSynthesis] Playback notice:', e.error);
+      logVoiceDebateDiagnostics({
+        voiceModeActive: true,
+        opponentResponseReceived: true,
+        responseRole: 'opponent',
+        responseTextLength: text.length,
+        ttsAvailable: true,
+        speechSynthesisState: 'error',
+        audioUnlocked: isAudioPipelineUnlocked,
+        playbackStarted: false,
+        playbackError: String(e.error || 'SpeechSynthesisUtterance error'),
+      });
       if (sessionId === currentPlaySessionId) {
         options.onEnd?.();
       }
     };
 
     synth.speak(utter);
-  } catch (err) {
+  } catch (err: any) {
     console.warn('[SpeechSynthesis] Playback error:', err);
+    logVoiceDebateDiagnostics({
+      voiceModeActive: true,
+      opponentResponseReceived: true,
+      responseRole: 'opponent',
+      responseTextLength: text.length,
+      ttsAvailable: true,
+      speechSynthesisState: 'exception',
+      audioUnlocked: isAudioPipelineUnlocked,
+      playbackStarted: false,
+      playbackError: String(err?.message || err),
+    });
     options.onEnd?.();
   }
 }
 
 /**
  * Single-pass continuous Neural TTS audio playback from VoiceStudio local engine.
- * Synthesizes the entire response as ONE coherent studio-grade MP3 audio stream to ensure
- * natural human-like prosody, smooth intonation, and zero robotic artifacts.
+ * Reuses the persistent shared HTMLAudioElement to prevent mobile autoplay rejections.
+ *
+ * If the backend TTS audio URL fails (VoiceStudio offline / 503 / network error),
+ * immediately falls back to browser SpeechSynthesis.
  */
 function playAudioStream(
   text: string,
   options: TTSOptions,
   sessionId: number,
+  generation: number,
 ): void {
-  const voiceParam = options.voiceId || (options.gender === 'male' ? 'sonTung' : 'default_vi');
-  const audioSourceUrl = options.audioUrl || (text ? `/api/v1/voice/tts?text=${encodeURIComponent(text)}&voice=${encodeURIComponent(voiceParam)}&lang=vi` : null);
-
-  if (!audioSourceUrl) {
+  // Check generation BEFORE starting
+  if (generation !== playbackGeneration) {
+    console.info('[Voice AutoPlay] Playback cancelled: generation mismatch before audio stream');
     options.onEnd?.();
     return;
   }
 
-  const audio = new Audio(audioSourceUrl);
+  const voiceParam = options.voiceId || (options.gender === 'male' ? 'sonTung' : 'default_vi');
+  const audioSourceUrl = options.audioUrl || (text ? `/api/v1/voice/tts?text=${encodeURIComponent(text)}&voice=${encodeURIComponent(voiceParam)}&lang=vi` : null);
+
+  if (!audioSourceUrl) {
+    console.info('[TTS Source] No audio URL available, using browser SpeechSynthesis directly');
+    playSpeechSynthesisFallback(text, options, sessionId, generation);
+    return;
+  }
+
+  console.info(`[TTS Source] Attempting backend audio: ${audioSourceUrl.substring(0, 80)}...`);
+
+  // Reuse the persistent shared audio player to prevent mobile autoplay restrictions
+  const audio = getOrCreateAudioElement() || new Audio();
   currentAudioElement = audio;
 
   audio.onended = () => {
     if (sessionId !== currentPlaySessionId) return;
-    currentAudioElement = null;
     options.onEnd?.();
   };
 
-  audio.onerror = (e) => {
-    console.warn('[VoiceStudio] Neural audio stream error, falling back to browser TTS:', e);
+  audio.onerror = () => {
+    console.warn('[TTS Source] Backend audio failed (VoiceStudio likely offline), falling back to browser SpeechSynthesis');
+    // Check generation before falling back — user may have pressed Stop
+    if (generation !== playbackGeneration) {
+      console.info('[TTS Source] Fallback cancelled: generation mismatch after audio error');
+      options.onEnd?.();
+      return;
+    }
     if (sessionId === currentPlaySessionId) {
-      currentAudioElement = null;
-      playSpeechSynthesisFallback(text, options, sessionId);
+      playSpeechSynthesisFallback(text, options, sessionId, generation);
     }
   };
 
-  audio.play().catch((err) => {
-    console.warn('[VoiceStudio] Neural audio play error, falling back to browser TTS:', err);
-    if (sessionId === currentPlaySessionId) {
-      currentAudioElement = null;
-      playSpeechSynthesisFallback(text, options, sessionId);
+  try {
+    audio.src = audioSourceUrl;
+    audio.load();
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          // Verify generation is still valid after async play() resolves
+          if (generation !== playbackGeneration) {
+            audio.pause();
+            audio.currentTime = 0;
+            return;
+          }
+          console.info('[TTS Source] source=backend_audio | audioUrlPresent=true | playback=success');
+          logVoiceDebateDiagnostics({
+            voiceModeActive: true,
+            opponentResponseReceived: true,
+            responseRole: 'opponent',
+            responseTextLength: text.length,
+            ttsAvailable: true,
+            speechSynthesisState: 'audio_playing',
+            audioUnlocked: isAudioPipelineUnlocked,
+            playbackStarted: true,
+            playbackError: null,
+          });
+        })
+        .catch((err) => {
+          console.warn('[TTS Source] Audio play rejection:', err?.name, err?.message, '| Falling back to SpeechSynthesis');
+          // Check generation before falling back
+          if (generation !== playbackGeneration) {
+            console.info('[TTS Source] Fallback cancelled: generation mismatch after play rejection');
+            options.onEnd?.();
+            return;
+          }
+          if (sessionId === currentPlaySessionId) {
+            playSpeechSynthesisFallback(text, options, sessionId, generation);
+          }
+        });
     }
-  });
+  } catch (err) {
+    console.warn('[TTS Source] Audio setup exception:', err, '| Falling back to SpeechSynthesis');
+    if (generation !== playbackGeneration) {
+      options.onEnd?.();
+      return;
+    }
+    if (sessionId === currentPlaySessionId) {
+      playSpeechSynthesisFallback(text, options, sessionId, generation);
+    }
+  }
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Speak AI Opponent response strictly using VoiceStudio local microservice.
+ * Speak AI Opponent response using VoiceStudio local microservice or seamless browser fallback.
  */
 export type SpeakResult = 'ok' | 'no_voice' | 'unsupported' | 'empty';
 
@@ -352,12 +601,15 @@ export function speakOpponentResponse(
   const cleaned = cleanForSpeech(text);
   if (!cleaned) return 'empty';
 
-  // Stop any active speech before starting new one (increments session ID)
-  stopSpeaking();
+  // Stop any active speech before starting new one (increments session ID AND generation)
+  stopActiveSpeech();
   const sessionId = ++currentPlaySessionId;
+  const generation = playbackGeneration; // Capture current generation for this playback
 
-  // Strictly VoiceStudio Local Audio
-  playAudioStream(cleaned, options, sessionId);
+  console.info(`[Voice AutoPlay] speakOpponentResponse called | textLen=${cleaned.length} | generation=${generation} | audioUnlocked=${isAudioPipelineUnlocked}`);
+
+  // Stream Neural Audio or fallback smoothly to SpeechSynthesis
+  playAudioStream(cleaned, options, sessionId, generation);
   return 'ok';
 }
 
@@ -371,33 +623,49 @@ export function speakText(text: string, options: SpeakOptions = {}): boolean {
 
 /**
  * Stop any currently playing speech immediately across both engines.
+ * Resets audio player and cancels active speech synthesis.
+ * Increments the playback generation to invalidate ALL in-flight async playback attempts.
+ *
+ * After calling this, no pending async callback (from audio.play().then, onerror fallback,
+ * etc.) will be able to restart playback because the generation will have changed.
  */
-export function stopSpeaking(): void {
-  // Invalidate any in-flight playback sessions
+export function stopActiveSpeech(): void {
+  // 0. Invalidate ALL in-flight and future async playback for the old generation
+  playbackGeneration++;
   currentPlaySessionId++;
 
-  // 1. Stop HTML5 audio player
-  if (currentAudioElement) {
+  console.info(`[Voice Stop] stopActiveSpeech called | new generation=${playbackGeneration}`);
+
+  // 1. Stop persistent shared HTML5 audio player — FULL RESET
+  if (sharedAudioElement) {
+    try {
+      sharedAudioElement.pause();
+      sharedAudioElement.currentTime = 0;
+      sharedAudioElement.src = '';
+      sharedAudioElement.load(); // Forces browser to release the audio resource
+    } catch {}
+  }
+  if (currentAudioElement && currentAudioElement !== sharedAudioElement) {
     try {
       currentAudioElement.pause();
       currentAudioElement.currentTime = 0;
-      currentAudioElement.removeAttribute('src');
       currentAudioElement.src = '';
       currentAudioElement.load();
     } catch {}
-    currentAudioElement = null;
   }
+  currentAudioElement = null;
 
-  // 2. Stop Web Speech Synthesis
+  // 2. Stop Web Speech Synthesis — IMMEDIATE cancel
   const synth = getSynth();
   if (synth) {
     try {
-      const token = (synth as any).__ttsToken;
-      if (token) token.cancelled = true;
       synth.cancel();
     } catch {}
   }
 }
+
+/** Alias for backward compatibility */
+export const stopSpeaking = stopActiveSpeech;
 
 // Global cleanup on browser page unload or backward/forward navigation
 if (typeof window !== 'undefined') {

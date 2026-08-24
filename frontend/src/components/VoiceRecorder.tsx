@@ -28,6 +28,7 @@ import {
   RotateCcw,
   Loader2,
 } from 'lucide-react';
+import { unlockAudioPipeline } from '../utils/tts';
 
 // --- Types ---
 
@@ -319,6 +320,9 @@ export function VoiceRecorder({
 
   // Start recording
   const startRecording = useCallback(async () => {
+    // Prime and unlock the browser/mobile audio pipeline directly on user interaction gesture
+    unlockAudioPipeline();
+
     setErrorMsg(null);
     setMetrics(null);
     setTranscript('');
@@ -422,6 +426,9 @@ export function VoiceRecorder({
 
   // Stop recording & analyze
   const stopRecording = useCallback(() => {
+    // Prime and unlock audio pipeline on stop gesture
+    unlockAudioPipeline();
+
     const recorder = mediaRecorderRef.current;
     if (!recorder || recorder.state !== 'recording') return;
     if (timerRef.current) clearInterval(timerRef.current);

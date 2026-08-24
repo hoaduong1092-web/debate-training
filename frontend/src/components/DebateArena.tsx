@@ -21,7 +21,7 @@ import { DebateInput } from './arena/DebateInput';
 import { CoachPanel } from './arena/CoachPanel';
 import { CoachBottomSheet } from './arena/CoachBottomSheet';
 import { ArgumentMapHUD } from './arena/ArgumentMapHUD';
-import { speakOpponentResponse, stopSpeaking } from '../utils/tts';
+import { speakOpponentResponse, stopSpeaking, stopActiveSpeech, isAudioUnlocked, logVoiceDebateDiagnostics } from '../utils/tts';
 import { Strings, Language } from '../lib/i18n';
 
 // --- INLINE SVG ICONS (CLEAN & ADAPTIVE) ---
@@ -338,6 +338,7 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
 
   useEffect(() => {
     if (inputMode === 'voice') {
+      setAutoPlayTts(true);
       void checkVoiceEntitlement();
     }
   }, [inputMode, checkVoiceEntitlement]);
@@ -349,7 +350,16 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
   const [debatedArgumentIds, setDebatedArgumentIds] = useState<Set<string>>(new Set());
 
   const [isTtsPlaying, setIsTtsPlaying] = useState(false);
-  const [autoPlayTts, setAutoPlayTts] = useState<boolean>(false);
+  const [autoPlayTts, setAutoPlayTts] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('arena_autoplay_tts');
+      if (saved !== null) return saved === 'true';
+    }
+    return true; // Default auto-play enabled for hands-free voice debate
+  });
+
+  // Track the turn index that has already initiated speech to prevent duplicate playback on re-render
+  const lastSpokenTurnRef = useRef<number>(-1);
 
   const [turns, setTurns] = useState<TurnData[]>([]);
   const [selectedTurn, setSelectedTurn] = useState<number>(0);
@@ -439,6 +449,8 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
       if (!confirmChange) return;
     }
 
+    stopActiveSpeech();
+    lastSpokenTurnRef.current = -1;
     setTurns([]);
     setSelectedTurn(0);
     setSpeechSeconds(0);
@@ -554,20 +566,28 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
   // Safe global cleanup on unmount
   useEffect(() => {
     return () => {
-      stopSpeaking();
+      stopActiveSpeech();
       if (userAudioRef.current) userAudioRef.current.pause();
     };
   }, []);
 
   // Cut off speech and user audio playback when switching turns in Arena
   useEffect(() => {
-    stopSpeaking();
+    stopActiveSpeech();
     setIsTtsPlaying(false);
     if (userAudioRef.current) {
       userAudioRef.current.pause();
       setUserAudioPlayingTurn(null);
     }
   }, [selectedTurn]);
+
+  // Cut off speech immediately if user switches from voice to text mode
+  useEffect(() => {
+    if (inputMode === 'text') {
+      stopActiveSpeech();
+      setIsTtsPlaying(false);
+    }
+  }, [inputMode]);
 
   // Speech Timer effect
   useEffect(() => {
@@ -657,9 +677,11 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
   }, []);
 
   // Manual Toggle button helper (Play / Pause)
+  // When stopping: uses stopActiveSpeech which increments the playback generation,
+  // ensuring no in-flight async callback can restart playback after Stop is pressed.
   const handleTtsPlayback = useCallback((text: string, audioUrl?: string | null) => {
     if (isTtsPlaying) {
-      stopSpeaking();
+      stopActiveSpeech();
       setIsTtsPlaying(false);
     } else {
       playOpponentTts(text, audioUrl);
@@ -883,10 +905,34 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
         void saveSessionToHistory(updatedTurns, currentSid, resp.session_completed || false);
 
         // Auto-play TTS on opponent response ONLY in Voice Mode for hands-free voice sparring
-        if (inputMode === 'voice' && autoPlayTts && opponentReply) {
-          setTimeout(() => {
+        const isVoiceActive = inputMode === 'voice';
+        const shouldAutoPlay = isVoiceActive && autoPlayTts && !!opponentReply;
+        const alreadySpoken = lastSpokenTurnRef.current === currentTurnNum;
+
+        console.info(`[Voice AutoPlay] Decision point | inputMode=${inputMode} | autoPlayTts=${autoPlayTts} | opponentReplyLen=${opponentReply?.length ?? 0} | isVoiceActive=${isVoiceActive} | shouldAutoPlay=${shouldAutoPlay} | alreadySpoken=${alreadySpoken} | lastSpokenTurn=${lastSpokenTurnRef.current} | currentTurn=${currentTurnNum} | audioUnlocked=${isAudioUnlocked()} | hasOpponentAudio=${!!opponentAudio}`);
+
+        if (shouldAutoPlay) {
+          if (!alreadySpoken) {
+            lastSpokenTurnRef.current = currentTurnNum;
+            logVoiceDebateDiagnostics({
+              voiceModeActive: isVoiceActive,
+              opponentResponseReceived: true,
+              responseRole: 'opponent',
+              responseTextLength: opponentReply.length,
+              ttsAvailable: true,
+              speechSynthesisState: 'initiating_auto_playback',
+              audioUnlocked: isAudioUnlocked(),
+              playbackStarted: true,
+              playbackError: null,
+            });
+            console.info(`[Voice AutoPlay] ✅ TRIGGERING playOpponentTts for turn ${currentTurnNum}`);
+            // Execute speech immediately on the unlocked audio pipeline
             playOpponentTts(opponentReply, opponentAudio);
-          }, 150);
+          } else {
+            console.info(`[Voice AutoPlay] ⏭️ SKIPPED — turn ${currentTurnNum} already spoken`);
+          }
+        } else {
+          console.info(`[Voice AutoPlay] ❌ NOT auto-playing — isVoiceActive=${isVoiceActive} autoPlayTts=${autoPlayTts} hasReply=${!!opponentReply}`);
         }
 
         if (resp.session_completed) {
@@ -941,7 +987,8 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
 
   const handleStartNewDebate = () => {
     if (userAudioRef.current) userAudioRef.current.pause();
-    stopSpeaking();
+    stopActiveSpeech();
+    lastSpokenTurnRef.current = -1;
     stableSessionIdRef.current = '';
     setSessionId('');
     setTurns([]);

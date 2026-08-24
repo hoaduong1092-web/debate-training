@@ -1,7 +1,7 @@
 import React from 'react';
 import { TurnData } from '../DebateArena';
 import { DebateStance } from '../../lib/api';
-import { stopSpeaking } from '../../utils/tts';
+import { stopSpeaking, stopActiveSpeech } from '../../utils/tts';
 
 export interface SparringFeedProps {
   currentTurnData?: TurnData | null;
@@ -140,7 +140,7 @@ export const SparringFeed: React.FC<SparringFeedProps> = ({
                     setAutoPlayTts((v) => {
                       const next = !v;
                       if (!next) {
-                        stopSpeaking();
+                        stopActiveSpeech();
                       }
                       try { localStorage.setItem('arena_autoplay_tts', String(next)); } catch {}
                       return next;

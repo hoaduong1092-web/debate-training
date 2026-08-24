@@ -2,7 +2,7 @@ import React from 'react';
 import { TurnData } from '../DebateArena';
 import { VoiceEntitlementResult, VoiceMetricsPayload } from '../../lib/api';
 import { VoiceRecorder } from '../VoiceRecorder';
-import { stopSpeaking } from '../../utils/tts';
+import { stopActiveSpeech, unlockAudioPipeline } from '../../utils/tts';
 
 export interface DebateInputProps {
   inputMode: 'text' | 'voice';
@@ -81,7 +81,7 @@ export const DebateInput: React.FC<DebateInputProps> = ({
               onClick={() => {
                 setInputMode('text');
                 setAutoPlayTts(false);
-                stopSpeaking();
+                stopActiveSpeech();
                 try { localStorage.setItem('arena_autoplay_tts', 'false'); } catch {}
               }}
               className={`flex-1 sm:flex-initial min-h-[44px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg transition font-semibold cursor-pointer ${
@@ -98,6 +98,7 @@ export const DebateInput: React.FC<DebateInputProps> = ({
             <button
               type="button"
               onClick={() => {
+                unlockAudioPipeline();
                 setInputMode('voice');
                 setAutoPlayTts(true);
                 try { localStorage.setItem('arena_autoplay_tts', 'true'); } catch {}
@@ -250,7 +251,7 @@ export const DebateInput: React.FC<DebateInputProps> = ({
               onClick={() => {
                 setInputMode('text');
                 setAutoPlayTts(false);
-                stopSpeaking();
+                stopActiveSpeech();
                 try { localStorage.setItem('arena_autoplay_tts', 'false'); } catch {}
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition font-semibold cursor-pointer ${
@@ -267,6 +268,7 @@ export const DebateInput: React.FC<DebateInputProps> = ({
             <button
               type="button"
               onClick={() => {
+                unlockAudioPipeline();
                 setInputMode('voice');
                 setAutoPlayTts(true);
                 try { localStorage.setItem('arena_autoplay_tts', 'true'); } catch {}
