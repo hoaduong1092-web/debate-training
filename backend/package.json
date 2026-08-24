@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "prisma generate && tsc",
-    "start": "prisma db push --accept-data-loss && node dist/index.js",
+    "start": "npx prisma db push --accept-data-loss && node dist/index.js",
     "voicestudio": "python voicestudio_service/server.py",
     "test:debate": "tsx src/testDebate.ts",
     "test:parser": "tsx src/logicCoachParser.test.ts",
@@ -28,6 +28,7 @@
     "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
     "openai": "^7.5.0",
+    "prisma": "^6.19.3",
     "ws": "^8.21.3"
   },
   "devDependencies": {
@@ -35,7 +36,6 @@
     "@types/express": "^5.0.1",
     "@types/ioredis": "^4.28.10",
     "@types/node": "^24.0.0",
-    "prisma": "^6.19.3",
     "tsx": "^4.20.0",
     "typescript": "^5.8.0"
   }
