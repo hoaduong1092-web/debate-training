@@ -22,7 +22,18 @@ export class AuthController {
 
       const result = await OtpService.generateOtp(normalizedPhone);
       if (!result.success) {
-        res.status(429).json({ success: false, error: result.message, cooldownRemaining: result.cooldownRemaining });
+        let statusCode = 400;
+        if (result.code === 'COOLDOWN' || result.code === 'DAILY_CAP') {
+          statusCode = 429;
+        } else if (result.code === 'SMS_NOT_CONFIGURED' || result.code === 'SMS_SEND_FAILED') {
+          statusCode = 503;
+        }
+        res.status(statusCode).json({
+          success: false,
+          error: result.message,
+          code: result.code,
+          cooldownRemaining: result.cooldownRemaining,
+        });
         return;
       }
 
@@ -30,7 +41,7 @@ export class AuthController {
         success: true,
         message: result.message,
         phone: normalizedPhone,
-        ...(result.otp ? { devOtp: result.otp } : {}),
+        ...(result.devOtp ? { devOtp: result.devOtp } : {}),
       });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message || 'Lỗi xử lý gửi OTP' });
@@ -49,7 +60,12 @@ export class AuthController {
 
       const verifyResult = await OtpService.verifyOtp(normalizedPhone, otp);
       if (!verifyResult.success) {
-        res.status(400).json({ success: false, error: verifyResult.message });
+        res.status(400).json({
+          success: false,
+          error: verifyResult.message,
+          code: verifyResult.code,
+          remainingAttempts: verifyResult.remainingAttempts,
+        });
         return;
       }
 
