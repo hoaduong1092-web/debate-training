@@ -77,7 +77,7 @@ export const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="cyber-grid-bg min-h-screen bg-slate-100 dark:bg-[#090d16] text-slate-800 dark:text-slate-100 flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200 transition-colors duration-200">
+    <div className="cyber-grid-bg min-h-screen min-h-dvh bg-slate-100 dark:bg-[#090d16] text-slate-800 dark:text-slate-100 flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200 transition-colors duration-200">
       {/* ── TOP NAVBAR: UNIFIED HEADER & CONTROLS ── */}
       <header className="sticky top-0 z-40 w-full bg-white/80 dark:bg-slate-950/75 backdrop-blur-2xl border-b border-slate-200 dark:border-white/10 px-4 lg:px-8 py-3 transition-all">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
@@ -171,12 +171,12 @@ export const Dashboard: React.FC = () => {
           </div>
 
           {/* Right Action Controls */}
-          <div className="flex items-center gap-3">
-            {/* User Profile Pill */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* User Profile Pill (Desktop) */}
             {user && (user.displayName || user.phoneNumber) && (
-              <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-700 dark:text-slate-300">
+              <div className="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-700 dark:text-slate-300">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>{user.displayName || user.phoneNumber}</span>
+                <span className="truncate max-w-[120px]">{user.displayName || user.phoneNumber}</span>
               </div>
             )}
 
@@ -184,14 +184,37 @@ export const Dashboard: React.FC = () => {
             <button
               type="button"
               onClick={() => setShowPricing(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-300 border border-amber-500/20 hover:border-amber-500/50 hover:bg-amber-500/15 hover:shadow-lg hover:shadow-amber-500/10 transition-all shrink-0 active:scale-95 cursor-pointer"
+              className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-300 border border-amber-500/20 hover:border-amber-500/50 hover:bg-amber-500/15 hover:shadow-lg hover:shadow-amber-500/10 transition-all shrink-0 active:scale-95 cursor-pointer"
+              title="Xem và nạp thêm hạn ngạch Thinking OS"
             >
               <svg width="14" height="14" className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M6 3h12l4 6-10 12L2 9z"/>
               </svg>
-              <span className="font-mono font-semibold">
-                {user?.quota?.textTurnsRemaining ?? 20} Text | {user?.quota?.voiceMinsRemaining ?? 15}m Voice
+              <span className="font-mono font-semibold text-[11px] sm:text-xs">
+                <span className="hidden sm:inline">
+                  {user?.quota?.textTurnsRemaining ?? 20} Text | {user?.quota?.voiceMinsRemaining ?? 15}m Voice
+                </span>
+                <span className="inline sm:hidden">
+                  {user?.quota?.textTurnsRemaining ?? 20}⚡ {user?.quota?.voiceMinsRemaining ?? 15}m🎙️
+                </span>
               </span>
+            </button>
+
+            {/* Profile & Pricing Shortcut (Mobile only) */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('profile')}
+              className={`md:hidden p-2 rounded-xl border transition-all shrink-0 active:scale-95 cursor-pointer ${
+                activeTab === 'profile'
+                  ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30'
+                  : 'border-slate-200 dark:border-slate-800 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/70 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300'
+              }`}
+              title={language === 'vi' ? 'Hồ sơ & Gói cước' : 'Profile & Plans'}
+              aria-label="Tài khoản"
+            >
+              <svg width="15" height="15" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+              </svg>
             </button>
 
             {/* Theme Toggle Button */}
@@ -231,54 +254,8 @@ export const Dashboard: React.FC = () => {
         </div>
       </header>
 
-      {/* ── MOBILE NAV BAR ── */}
-      <div className="md:hidden flex items-center justify-around bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 p-2 text-xs font-semibold overflow-x-auto gap-1">
-        <button
-          type="button"
-          onClick={() => setActiveTab('arena')}
-          className={`px-2.5 py-1.5 rounded-lg whitespace-nowrap ${activeTab === 'arena' ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}
-        >
-          ⚔️ {t.navArena}
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('assistant')}
-          className={`px-2.5 py-1.5 rounded-lg whitespace-nowrap ${activeTab === 'assistant' ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}
-        >
-          🤖 {t.navAssistant}
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('plaza')}
-          className={`px-2.5 py-1.5 rounded-lg whitespace-nowrap ${activeTab === 'plaza' ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}
-        >
-          🏛️ {t.navPlaza}
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('history')}
-          className={`px-2.5 py-1.5 rounded-lg whitespace-nowrap ${activeTab === 'history' ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}
-        >
-          📜 {t.navHistory}
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('thinking')}
-          className={`px-2.5 py-1.5 rounded-lg whitespace-nowrap ${activeTab === 'thinking' ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}
-        >
-          🧠 {language === 'vi' ? 'Hồ Sơ Tư Duy' : 'Thinking Profile'}
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('profile')}
-          className={`px-2.5 py-1.5 rounded-lg whitespace-nowrap ${activeTab === 'profile' ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}
-        >
-          👤 {language === 'vi' ? 'Gói Cước' : 'Pricing & Plans'}
-        </button>
-      </div>
-
-      {/* ── MAIN CONTENT CONTAINER ── */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-6 flex flex-col">
+      {/* ── MAIN CONTENT CONTAINER (with safe bottom clearance for Mobile Bottom Nav) ── */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 lg:p-6 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:pb-6 flex flex-col">
         <div className={activeTab === 'arena' ? 'block' : 'hidden'}>
           <DebateArena
             onNavigateToHistory={() => setActiveTab('history')}
@@ -324,6 +301,79 @@ export const Dashboard: React.FC = () => {
           />
         </div>
       </main>
+
+      {/* ── MOBILE BOTTOM NAVIGATION BAR ── */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-950/95 backdrop-blur-2xl border-t border-slate-200 dark:border-slate-800/80 px-1.5 py-1 pb-[max(0.4rem,env(safe-area-inset-bottom))] flex items-center justify-around shadow-[0_-4px_20px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_25px_rgba(0,0,0,0.5)]">
+        <button
+          type="button"
+          onClick={() => setActiveTab('arena')}
+          className={`min-h-[48px] flex-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
+            activeTab === 'arena'
+              ? 'bg-indigo-50/90 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 font-bold'
+              : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 font-medium'
+          }`}
+          aria-label={t.navArena}
+        >
+          <span className="text-base leading-none">⚔️</span>
+          <span className="text-[10px] tracking-tight">{t.navArena}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('assistant')}
+          className={`min-h-[48px] flex-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
+            activeTab === 'assistant'
+              ? 'bg-indigo-50/90 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 font-bold'
+              : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 font-medium'
+          }`}
+          aria-label={t.navAssistant}
+        >
+          <span className="text-base leading-none">🤖</span>
+          <span className="text-[10px] tracking-tight">{t.navAssistant}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('plaza')}
+          className={`min-h-[48px] flex-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
+            activeTab === 'plaza'
+              ? 'bg-indigo-50/90 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 font-bold'
+              : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 font-medium'
+          }`}
+          aria-label={t.navPlaza}
+        >
+          <span className="text-base leading-none">🏛️</span>
+          <span className="text-[10px] tracking-tight">{t.navPlaza}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('thinking')}
+          className={`min-h-[48px] flex-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
+            activeTab === 'thinking'
+              ? 'bg-indigo-50/90 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 font-bold'
+              : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 font-medium'
+          }`}
+          aria-label={language === 'vi' ? 'Hồ Sơ Tư Duy' : 'Thinking Profile'}
+        >
+          <span className="text-base leading-none">🧠</span>
+          <span className="text-[10px] tracking-tight">{language === 'vi' ? 'Tư Duy' : 'Thinking'}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('history')}
+          className={`min-h-[48px] flex-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
+            activeTab === 'history'
+              ? 'bg-indigo-50/90 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 font-bold'
+              : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 font-medium'
+          }`}
+          aria-label={t.navHistory}
+        >
+          <span className="text-base leading-none">📜</span>
+          <span className="text-[10px] tracking-tight">{t.navHistory}</span>
+        </button>
+      </nav>
 
       {/* ── MODALS ── */}
       <PricingModal isOpen={showPricing} onClose={() => setShowPricing(false)} language={language} t={t} />

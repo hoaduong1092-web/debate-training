@@ -164,22 +164,22 @@ function LearningModal({ detail, t, language, onClose }: LearningModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+      className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in"
       onClick={handleBackdrop}
       role="dialog"
       aria-modal
       aria-label={t.plazaLearningViewTitle || 'Nghiên cứu & Học tập bài đấu'}
     >
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-scale-up">
+      <div className="bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-3xl max-w-4xl w-full max-h-[88dvh] overflow-hidden flex flex-col shadow-2xl animate-slide-up sm:animate-scale-up pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
         
         {/* Modal Header */}
-        <div className="p-5 md:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4 bg-slate-50/70 dark:bg-slate-950/40">
+        <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4 bg-slate-50/70 dark:bg-slate-950/40">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
               <BookOpen size={20} aria-hidden />
             </div>
             <div className="min-w-0">
-              <h2 className="text-base md:text-lg font-bold text-slate-900 dark:text-white truncate">
+              <h2 className="text-sm sm:text-base md:text-lg font-bold text-slate-900 dark:text-white truncate">
                 {t.plazaLearningViewTitle || 'Nghiên Cứu & Học Tập Bài Đấu'}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
@@ -189,7 +189,7 @@ function LearningModal({ detail, t, language, onClose }: LearningModalProps) {
           </div>
           <button
             type="button"
-            className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition cursor-pointer"
+            className="min-h-[44px] min-w-[44px] rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition cursor-pointer active:scale-95"
             onClick={onClose}
             aria-label={t.plazaClose || 'Đóng'}
           >
@@ -462,12 +462,12 @@ function DebateCard({
       )}
 
       {/* Footer Date & Actions */}
-      <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-2">
+      <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-1">
           {/* Like Button */}
           <button
             type="button"
-            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+            className={`min-h-[44px] flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
               item.is_liked
                 ? 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10'
                 : 'text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50/50 dark:hover:bg-rose-500/5'
@@ -480,14 +480,14 @@ function DebateCard({
             aria-label={t.plazaLike || 'Thích'}
             aria-pressed={item.is_liked}
           >
-            <Heart size={14} aria-hidden fill={item.is_liked ? 'currentColor' : 'none'} />
-            <span className="font-mono">{item.like_count}</span>
+            <Heart size={15} aria-hidden fill={item.is_liked ? 'currentColor' : 'none'} />
+            <span className="font-mono font-bold">{item.like_count}</span>
           </button>
 
           {/* Favorite Button */}
           <button
             type="button"
-            className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
+            className={`min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-xl text-xs transition-all cursor-pointer ${
               item.is_favorited
                 ? 'text-amber-500 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10'
                 : 'text-slate-400 hover:text-amber-500 hover:bg-amber-50/50'
@@ -501,7 +501,7 @@ function DebateCard({
             aria-pressed={item.is_favorited}
             title={item.is_favorited ? 'Đã lưu vào danh sách học tập' : 'Lưu bài đấu'}
           >
-            <Star size={14} aria-hidden fill={item.is_favorited ? 'currentColor' : 'none'} />
+            <Star size={15} aria-hidden fill={item.is_favorited ? 'currentColor' : 'none'} />
           </button>
 
           {/* View Counter */}
@@ -517,14 +517,14 @@ function DebateCard({
         {/* Study Action Button */}
         <button
           type="button"
-          className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer shrink-0"
+          className="min-h-[44px] px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer shrink-0"
           onClick={(e) => {
             e.stopPropagation();
             onStudy(item.id);
           }}
           aria-label={t.plazaStudy || 'Nghiên cứu bài nói'}
         >
-          <BookOpen size={13} aria-hidden />
+          <BookOpen size={14} aria-hidden />
           <span>{t.plazaStudy || 'Nghiên cứu bài nói'}</span>
         </button>
       </div>
@@ -788,7 +788,7 @@ export default function PlazaTab({ t, language, hidden = false }: PlazaTabProps)
             <button
               type="button"
               role="tab"
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 sort === 'latest'
                   ? 'bg-white dark:bg-indigo-600 text-slate-900 dark:text-white shadow-sm'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -801,7 +801,7 @@ export default function PlazaTab({ t, language, hidden = false }: PlazaTabProps)
             <button
               type="button"
               role="tab"
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 sort === 'popular'
                   ? 'bg-white dark:bg-indigo-600 text-slate-900 dark:text-white shadow-sm'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -814,11 +814,11 @@ export default function PlazaTab({ t, language, hidden = false }: PlazaTabProps)
           </div>
 
           {/* Search Form */}
-          <form className="relative flex-1 sm:w-64" onSubmit={handleSearchSubmit} role="search">
-            <Search size={15} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <form className="relative flex-1 sm:w-64 min-w-[180px]" onSubmit={handleSearchSubmit} role="search">
+            <Search size={15} aria-hidden className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="search"
-              className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-800 focus:border-indigo-500 rounded-xl pl-9 pr-8 py-2 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 outline-none transition"
+              className="w-full min-h-[44px] bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-800 focus:border-indigo-500 rounded-xl pl-9 pr-8 py-2 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 outline-none transition"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t.plazaSearchPlaceholder || 'Tìm kiếm chủ đề tranh luận...'}
@@ -827,7 +827,7 @@ export default function PlazaTab({ t, language, hidden = false }: PlazaTabProps)
             {searchQuery && (
               <button
                 type="button"
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
                 onClick={() => {
                   setSearchQuery('');
                   void loadFeed(sort, '');

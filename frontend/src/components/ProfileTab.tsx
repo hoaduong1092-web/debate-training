@@ -182,12 +182,16 @@ export default function ProfileTab({
 
   if (hidden) return null;
 
-  // Safe Quota Calculations (Guarantees NO NaN)
+  // Canonical Quota Calculations (Aligned with active subscription presence & zero-limit representation)
+  const hasActivePlan = Boolean(profile?.subscription?.plan);
+
   const textRemaining = Number(
     profile?.quota?.text_remaining ?? user?.quota?.textTurnsRemaining ?? 20
   );
-  const textLimit = Number(profile?.quota?.text_limit ?? 30);
-  const textPct = Math.min(100, Math.max(0, Math.round((textRemaining / (textLimit || 30)) * 100)));
+  const rawTextLimit = Number(profile?.quota?.text_limit ?? 0);
+  const hasTextLimit = hasActivePlan && rawTextLimit > 0;
+  const textLimit = hasTextLimit ? rawTextLimit : null;
+  const textPct = hasTextLimit ? Math.min(100, Math.max(0, Math.round((textRemaining / rawTextLimit) * 100))) : 100;
 
   const voiceRemaining = Number(
     voiceEntitlement?.availableMinutes ??
@@ -196,18 +200,22 @@ export default function ProfileTab({
     user?.quota?.voiceMinsRemaining ??
     15
   );
-  const voiceLimit = Number(
+  const rawVoiceLimit = Number(
     profile?.quota?.voice_limit ??
     profile?.quota?.audio_limit ??
-    15
+    0
   );
-  const voicePct = Math.min(100, Math.max(0, Math.round((voiceRemaining / (voiceLimit || 15)) * 100)));
+  const hasVoiceLimit = hasActivePlan && rawVoiceLimit > 0;
+  const voiceLimit = hasVoiceLimit ? rawVoiceLimit : null;
+  const voicePct = hasVoiceLimit ? Math.min(100, Math.max(0, Math.round((voiceRemaining / rawVoiceLimit) * 100))) : 100;
 
   const assistantRemaining = Number(
     profile?.quota?.assistant_remaining ?? user?.quota?.assistantRemaining ?? 10
   );
-  const assistantLimit = Number(profile?.quota?.assistant_limit ?? 10);
-  const asstPct = Math.min(100, Math.max(0, Math.round((assistantRemaining / (assistantLimit || 10)) * 100)));
+  const rawAsstLimit = Number(profile?.quota?.assistant_limit ?? 0);
+  const hasAsstLimit = hasActivePlan && rawAsstLimit > 0;
+  const assistantLimit = hasAsstLimit ? rawAsstLimit : null;
+  const asstPct = hasAsstLimit ? Math.min(100, Math.max(0, Math.round((assistantRemaining / rawAsstLimit) * 100))) : 100;
 
   const currentDisplayName = user?.displayName || user?.full_name || profile?.profile?.full_name || 'Học Viên Mẫu';
   const currentPlanId = (profile?.subscription?.plan ?? user?.plan ?? '').toUpperCase();
@@ -223,7 +231,7 @@ export default function ProfileTab({
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 space-y-8 animate-fade-in text-slate-900 dark:text-slate-100">
+    <div className="max-w-6xl mx-auto px-2 sm:px-4 py-4 sm:py-8 space-y-6 sm:space-y-8 animate-fade-in text-slate-900 dark:text-slate-100">
       
       {/* ── Top Alert Error if any ── */}
       {loadError && (
@@ -235,7 +243,7 @@ export default function ProfileTab({
           <button
             type="button"
             onClick={() => void loadData()}
-            className="px-3 py-1 bg-rose-600 text-white rounded-lg font-bold hover:bg-rose-500 transition"
+            className="px-3 py-1 bg-rose-600 text-white rounded-lg font-bold hover:bg-rose-500 transition cursor-pointer"
           >
             {language === 'vi' ? 'Thử lại' : 'Retry'}
           </button>
@@ -243,20 +251,20 @@ export default function ProfileTab({
       )}
 
       {/* ── 1. Profile Header Card ── */}
-      <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 lg:p-8 shadow-sm relative overflow-hidden">
+      <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-6 lg:p-8 shadow-sm relative overflow-hidden">
         <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/5 rounded-full blur-3xl -z-10 pointer-events-none" />
 
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-center gap-5">
+          <div className="flex items-center gap-4 sm:gap-5">
             {/* Avatar */}
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-3xl font-black shadow-lg shadow-indigo-500/20 shrink-0">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-2xl sm:text-3xl font-black shadow-lg shadow-indigo-500/20 shrink-0">
               {currentDisplayName.charAt(0).toUpperCase()}
             </div>
 
             {/* Info */}
-            <div className="space-y-1.5">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <h2 className="text-2xl font-black text-slate-900 dark:text-white">
+            <div className="space-y-1.5 min-w-0">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+                <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white truncate">
                   {currentDisplayName}
                 </h2>
                 <span className={`text-[11px] font-mono font-black px-2.5 py-0.5 rounded-md border ${badge.bg}`}>
@@ -269,13 +277,13 @@ export default function ProfileTab({
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-slate-500 dark:text-slate-400">
                 <span className="flex items-center gap-1.5 font-mono">
-                  <Phone size={13} className="text-indigo-500" />
+                  <Phone size={13} className="text-indigo-500 shrink-0" />
                   {user?.phoneNumber || '+84901234567'}
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <Calendar size={13} className="text-indigo-500" />
+                  <Calendar size={13} className="text-indigo-500 shrink-0" />
                   {language === 'vi' ? 'Thành viên từ:' : 'Member since:'} {formatDate(profile?.profile?.created_at, language)}
                 </span>
               </div>
@@ -283,11 +291,11 @@ export default function ProfileTab({
           </div>
 
           {/* Quick Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3">
             <button
               type="button"
               onClick={() => setIsPricingModalOpen(true)}
-              className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-lg shadow-indigo-600/25 flex items-center gap-2 active:scale-95 cursor-pointer"
+              className="flex-1 sm:flex-none px-4 sm:px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 active:scale-95 cursor-pointer min-h-[44px]"
             >
               <Zap size={14} className="fill-current" />
               <span>{language === 'vi' ? 'Nâng Cấp Gói' : 'Upgrade Plan'}</span>
@@ -296,7 +304,7 @@ export default function ProfileTab({
               type="button"
               onClick={() => void loadData()}
               title={language === 'vi' ? 'Làm mới dữ liệu' : 'Refresh data'}
-              className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
+              className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
             >
               <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
             </button>
@@ -308,7 +316,7 @@ export default function ProfileTab({
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-black flex items-center gap-2 text-slate-900 dark:text-white">
+            <h3 className="text-base sm:text-lg font-black flex items-center gap-2 text-slate-900 dark:text-white">
               <Zap size={18} className="text-amber-500" />
               <span>{language === 'vi' ? 'Hạn Ngạch Thời Gian Thực (Thinking OS Quota)' : 'Real-Time Quota Dashboard'}</span>
             </h3>
@@ -320,9 +328,9 @@ export default function ProfileTab({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
           {/* Card 1: Text Debate */}
-          <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-3">
+          <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
                 <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
@@ -331,7 +339,15 @@ export default function ProfileTab({
                 <span>{language === 'vi' ? 'Tranh Biện Văn Bản' : 'Text Debate Turns'}</span>
               </div>
               <span className="font-mono text-sm font-black text-indigo-600 dark:text-indigo-400">
-                {textRemaining} <span className="text-xs text-slate-400 font-normal">/ {textLimit} {language === 'vi' ? 'lượt' : 'turns'}</span>
+                {hasTextLimit && textLimit ? (
+                  <>
+                    {textRemaining} <span className="text-xs text-slate-400 font-normal">/ {textLimit} {language === 'vi' ? 'lượt' : 'turns'}</span>
+                  </>
+                ) : (
+                  <>
+                    {textRemaining} <span className="text-xs text-slate-400 font-normal">{language === 'vi' ? 'lượt khả dụng' : 'turns available'}</span>
+                  </>
+                )}
               </span>
             </div>
 
@@ -343,14 +359,14 @@ export default function ProfileTab({
             </div>
 
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              {language === 'vi'
-                ? 'Mỗi phiên tranh biện văn bản hỗ trợ tối đa 20 lượt phản biện cùng AI Coaches.'
-                : 'Each text debate session supports up to 20 argument rounds with AI Coaches.'}
+              {hasTextLimit
+                ? (language === 'vi' ? `Hạn mức chu kỳ thuê bao: ${textLimit} lượt tranh biện văn bản.` : `Subscription period allowance: ${textLimit} debate turns.`)
+                : (language === 'vi' ? 'Số dư khả dụng từ tài khoản dùng thử / gói nạp thêm (không giới hạn chu kỳ).' : 'Available balance from free trial or top-up packs.')}
             </p>
           </div>
 
-          {/* Card 2: Voice Debate (NO NaN) */}
-          <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-3">
+          {/* Card 2: Voice Debate */}
+          <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
                 <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
@@ -359,9 +375,17 @@ export default function ProfileTab({
                 <span>{language === 'vi' ? 'Tranh Biện Giọng Nói (Voice AI)' : 'Voice Debate (Voice AI)'}</span>
               </div>
               <span className="font-mono text-sm font-black text-emerald-600 dark:text-emerald-400">
-                {voiceEntitlement?.mode === 'TIME_UNLIMITED'
-                  ? (language === 'vi' ? 'VIP (Không trừ)' : 'VIP (No deduction)')
-                  : `${voiceRemaining} / ${voiceLimit} ${language === 'vi' ? 'phút' : 'mins'}`}
+                {voiceEntitlement?.mode === 'TIME_UNLIMITED' ? (
+                  language === 'vi' ? 'VIP (Không trừ)' : 'VIP (No deduction)'
+                ) : hasVoiceLimit && voiceLimit ? (
+                  <>
+                    {voiceRemaining} <span className="text-xs text-slate-400 font-normal">/ {voiceLimit} {language === 'vi' ? 'phút' : 'mins'}</span>
+                  </>
+                ) : (
+                  <>
+                    {voiceRemaining} <span className="text-xs text-slate-400 font-normal">{language === 'vi' ? 'phút khả dụng' : 'mins available'}</span>
+                  </>
+                )}
               </span>
             </div>
 
@@ -375,12 +399,14 @@ export default function ProfileTab({
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
               {voiceEntitlement?.mode === 'TIME_UNLIMITED'
                 ? (language === 'vi' ? 'VIP Time Pass: Không trừ quota (tối đa 15 phút mỗi phiên tranh biện).' : 'VIP Time Pass: Zero quota deduction (15 min cap per session).')
+                : hasVoiceLimit
+                ? (language === 'vi' ? `Định mức chu kỳ: ${voiceLimit} phút luyện giọng Voice AI.` : `Subscription period allowance: ${voiceLimit} mins voice debate.`)
                 : (language === 'vi' ? 'Voice DSP phân tích tốc độ WPM, từ đệm (ừm, à) và cao độ phát âm trực tiếp.' : 'Speech DSP measures real-time speaking pace (WPM), pitch, and filler words.')}
             </p>
           </div>
 
           {/* Card 3: Assistant Drafts */}
-          <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-3">
+          <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
                 <div className="p-2 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400">
@@ -389,7 +415,15 @@ export default function ProfileTab({
                 <span>{language === 'vi' ? 'Trợ Lý & Cố Vấn Tư Duy' : 'AI Assistant Consultations'}</span>
               </div>
               <span className="font-mono text-sm font-black text-purple-600 dark:text-purple-400">
-                {assistantRemaining} <span className="text-xs text-slate-400 font-normal">/ {assistantLimit} {language === 'vi' ? 'câu' : 'credits'}</span>
+                {hasAsstLimit && assistantLimit ? (
+                  <>
+                    {assistantRemaining} <span className="text-xs text-slate-400 font-normal">/ {assistantLimit} {language === 'vi' ? 'câu' : 'credits'}</span>
+                  </>
+                ) : (
+                  <>
+                    {assistantRemaining} <span className="text-xs text-slate-400 font-normal">{language === 'vi' ? 'câu khả dụng' : 'credits available'}</span>
+                  </>
+                )}
               </span>
             </div>
 

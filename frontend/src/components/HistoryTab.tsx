@@ -286,9 +286,9 @@ export const HistoryTab: React.FC<Props> = ({ onStartNewDebate, language = 'vi',
   return (
     <div className="w-full flex flex-col gap-5 animate-fade-in">
       {/* ── HEADER & SEARCH CONTROLS ── */}
-      <div className="glass-panel rounded-2xl p-4 md:p-5 flex flex-wrap items-center justify-between gap-4 border border-slate-200 dark:border-white/10 shadow-sm transition-all">
+      <div className="glass-panel rounded-2xl p-4 md:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-slate-200 dark:border-white/10 shadow-sm transition-all">
         <div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
             <span>{t?.historyTitle || (language === 'vi' ? 'Lịch Sử Đối Luyện & Replay' : 'Debate History & Replay')}</span>
             <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30">
               {sessions.length} {language === 'vi' ? 'trận đấu' : 'debates'}
@@ -301,15 +301,15 @@ export const HistoryTab: React.FC<Props> = ({ onStartNewDebate, language = 'vi',
           </p>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
+        <div className="flex items-center gap-2.5 w-full sm:w-auto flex-wrap">
           {/* Search Box */}
-          <div className="relative flex-1 sm:w-60">
+          <div className="relative flex-1 sm:w-60 min-w-[180px]">
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={language === 'vi' ? 'Tìm kiếm theo chủ đề...' : 'Search by topic / motion...'}
-              className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-800 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition"
+              className="w-full min-h-[44px] bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-800 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition"
             />
           </div>
 
@@ -318,13 +318,13 @@ export const HistoryTab: React.FC<Props> = ({ onStartNewDebate, language = 'vi',
             <button
               type="button"
               onClick={handleDeleteSelected}
-              className="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition flex items-center gap-1.5 active:scale-95 shrink-0 cursor-pointer shadow-md shadow-rose-600/30"
+              className="min-h-[44px] px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition flex items-center gap-1.5 active:scale-95 shrink-0 cursor-pointer shadow-md shadow-rose-600/30"
               title={language === 'vi' ? 'Xóa các bản ghi đã tích chọn' : 'Delete selected records'}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
               </svg>
-              <span>{language === 'vi' ? `Xóa Đã Chọn (${selectedIds.size})` : `Delete Selected (${selectedIds.size})`}</span>
+              <span>{language === 'vi' ? `Xóa (${selectedIds.size})` : `Delete (${selectedIds.size})`}</span>
             </button>
           )}
 
@@ -333,7 +333,7 @@ export const HistoryTab: React.FC<Props> = ({ onStartNewDebate, language = 'vi',
             <button
               type="button"
               onClick={handleDeleteAll}
-              className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/30 text-xs font-bold transition flex items-center gap-1.5 active:scale-95 shrink-0 cursor-pointer shadow-sm"
+              className="min-h-[44px] px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/30 text-xs font-bold transition flex items-center gap-1.5 active:scale-95 shrink-0 cursor-pointer shadow-sm"
               title={language === 'vi' ? 'Xóa toàn bộ các bản ghi lịch sử' : 'Delete all history records'}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -347,10 +347,11 @@ export const HistoryTab: React.FC<Props> = ({ onStartNewDebate, language = 'vi',
           <button
             type="button"
             onClick={loadHistory}
-            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition active:scale-95 shrink-0 cursor-pointer"
+            className="min-h-[44px] min-w-[44px] p-2 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition active:scale-95 shrink-0 cursor-pointer flex items-center justify-center"
             title={language === 'vi' ? 'Làm mới danh sách' : 'Refresh list'}
+            aria-label={language === 'vi' ? 'Làm mới danh sách' : 'Refresh list'}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
               <path d="M3 3v5h5"/>
               <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
@@ -529,7 +530,7 @@ export const HistoryTab: React.FC<Props> = ({ onStartNewDebate, language = 'vi',
                       e.stopPropagation();
                       setSelectedReplayId(session.id);
                     }}
-                    className="px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 transition flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                    className="min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 transition flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
                   >
                     <span>▶ {language === 'vi' ? 'Xem Replay' : 'Watch Replay'}</span>
                   </button>
@@ -539,10 +540,11 @@ export const HistoryTab: React.FC<Props> = ({ onStartNewDebate, language = 'vi',
                     type="button"
                     disabled={deletingId === session.id}
                     onClick={(e) => handleDelete(session.id, e)}
-                    className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 border border-transparent hover:border-rose-200 dark:hover:border-rose-500/20 transition active:scale-95 cursor-pointer"
+                    className="min-h-[44px] min-w-[44px] p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 border border-transparent hover:border-rose-200 dark:hover:border-rose-500/20 transition active:scale-95 cursor-pointer flex items-center justify-center"
                     title={language === 'vi' ? 'Xóa bản ghi này' : 'Delete this record'}
+                    aria-label={language === 'vi' ? 'Xóa bản ghi này' : 'Delete this record'}
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
                     </svg>
                   </button>

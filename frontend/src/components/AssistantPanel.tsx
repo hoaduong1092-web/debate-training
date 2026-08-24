@@ -473,11 +473,11 @@ export function AssistantPanel({
   return (
     <div className="w-full flex flex-col gap-5 animate-fade-in text-slate-900 dark:text-slate-100">
       {/* ── SUB-NAV TAB SELECTOR ── */}
-      <div className="glass-panel rounded-2xl p-2 flex items-center gap-2 border border-slate-200 dark:border-white/10 shadow-sm">
+      <div className="flex items-center bg-slate-100 dark:bg-slate-900/80 p-1.5 rounded-2xl border border-slate-200 dark:border-white/10 gap-1.5">
         <button
           type="button"
           onClick={() => setActiveTab('speech')}
-          className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${
+          className={`flex-1 min-h-[44px] py-2.5 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
             activeTab === 'speech'
               ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -490,7 +490,7 @@ export function AssistantPanel({
         <button
           type="button"
           onClick={() => setActiveTab('motion')}
-          className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${
+          className={`flex-1 min-h-[44px] py-2.5 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
             activeTab === 'motion'
               ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -1189,7 +1189,7 @@ function SpeechDraftView({
               <button
                 type="button"
                 onClick={() => setStance('AFFIRMATIVE')}
-                className={`py-2.5 px-4 rounded-xl text-xs font-bold border transition-all ${
+                className={`min-h-[44px] py-2.5 px-4 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center ${
                   stance === 'AFFIRMATIVE'
                     ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500 shadow-md'
                     : 'bg-slate-50 dark:bg-slate-900/50 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800'
@@ -1200,7 +1200,7 @@ function SpeechDraftView({
               <button
                 type="button"
                 onClick={() => setStance('NEGATIVE')}
-                className={`py-2.5 px-4 rounded-xl text-xs font-bold border transition-all ${
+                className={`min-h-[44px] py-2.5 px-4 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center ${
                   stance === 'NEGATIVE'
                     ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500 shadow-md'
                     : 'bg-slate-50 dark:bg-slate-900/50 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800'
@@ -1221,7 +1221,7 @@ function SpeechDraftView({
               onChange={(e) => setRawIdeas(e.target.value)}
               placeholder={isVi ? 'Nhập các luận cứ, số liệu bạn muốn đưa vào bài nói...' : 'Enter key points or statistics...'}
               disabled={loading}
-              className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-800 focus:border-indigo-500 rounded-xl p-3 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition"
+              className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-800 focus:border-indigo-500 rounded-xl p-3 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition resize-y"
             />
           </div>
 
@@ -1235,7 +1235,7 @@ function SpeechDraftView({
           <button
             type="submit"
             disabled={loading || !topic.trim()}
-            className="w-full py-3.5 shimmer-btn text-white text-xs font-bold rounded-xl shadow-lg transition active:scale-95 flex items-center justify-center gap-2"
+            className="w-full min-h-[44px] py-3 shimmer-btn text-white text-xs font-bold rounded-xl shadow-lg transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
             {loading ? (
               <>
@@ -1558,7 +1558,7 @@ function MotionAnalysisView({
           <button
             type="submit"
             disabled={loading || !topic.trim()}
-            className="w-full py-3.5 shimmer-btn text-white text-xs font-bold rounded-xl shadow-lg transition active:scale-95 flex items-center justify-center gap-2"
+            className="w-full min-h-[44px] py-3 shimmer-btn text-white text-xs font-bold rounded-xl shadow-lg transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
             {loading ? (
               <>

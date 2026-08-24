@@ -188,6 +188,18 @@ export const AudioCheckModal: React.FC<AudioCheckModalProps> = ({ isOpen, onClos
     };
   }, [isOpen, startMicTest, cleanupMicTest]);
 
+  // Escape key handler for AudioCheckModal
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (

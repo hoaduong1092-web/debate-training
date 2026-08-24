@@ -240,6 +240,18 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
   const [copiedMemo, setCopiedMemo] = useState(false);
   const [fulfillmentSuccess, setFulfillmentSuccess] = useState(false);
 
+  // Escape key handler for PricingModal
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   useEffect(() => {
     if (isOpen) {
       setLoading(true);
@@ -428,19 +440,19 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 backdrop-blur-xl p-4 animate-fade-in">
-      <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-3xl max-w-4xl w-full p-6 lg:p-7 shadow-2xl relative flex flex-col max-h-[92vh] overflow-hidden text-slate-900 dark:text-slate-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 backdrop-blur-xl p-2 sm:p-4 animate-fade-in">
+      <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-2xl sm:rounded-3xl max-w-4xl w-full p-4 sm:p-6 lg:p-7 shadow-2xl relative flex flex-col max-h-[94dvh] overflow-hidden text-slate-900 dark:text-slate-100">
         
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800/80 pb-4 mb-4">
+        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800/80 pb-3 sm:pb-4 mb-3 sm:mb-4">
           <div>
-            <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2.5">
+            <h3 className="text-base sm:text-xl font-black text-slate-900 dark:text-white flex items-center gap-2 sm:gap-2.5">
               <span>{selectedItem ? (language === 'vi' ? 'Thanh Toán Gói Hạn Ngạch' : 'Checkout & Activation') : (language === 'vi' ? 'Nâng Cấp Hạn Ngạch Thinking OS' : 'Upgrade Thinking OS Quota')}</span>
               <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30">
                 v16.0
               </span>
             </h3>
-            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+            <p className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-400 mt-0.5 sm:mt-1">
               {selectedItem
                 ? (language === 'vi'
                     ? 'Quét mã VietQR Napas247 hoặc chọn cổng thanh toán để tự động kích hoạt gói tức thì.'
@@ -453,7 +465,7 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition active:scale-95"
+            className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition active:scale-95 cursor-pointer shrink-0 ml-2"
           >
             ✕
           </button>

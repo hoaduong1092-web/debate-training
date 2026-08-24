@@ -80,6 +80,18 @@ export const ThinkingProfileTab: React.FC<ThinkingProfileTabProps> = ({ language
     loadData(period);
   }, [period]);
 
+  // Escape key handler for Skill Level Detail Modal
+  useEffect(() => {
+    if (!selectedSkillLevel) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedSkillLevel(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedSkillLevel]);
+
   // ── SVG Radar Coordinate Computations ────────────────────────────────────────
   const radarAxes = useMemo(() => {
     const radar = analyticsData?.radar || { logic: 50, structure: 50, reflex: 50, voice: 50, overallScore: 50 };
@@ -173,16 +185,16 @@ export const ThinkingProfileTab: React.FC<ThinkingProfileTabProps> = ({ language
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* ── TOP HEADER & CONTROL BAR ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200 dark:border-slate-800/80 rounded-2xl shadow-xl shadow-indigo-950/5">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-cyan-500 p-0.5 shadow-lg shadow-indigo-500/20 flex items-center justify-center">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 sm:p-5 bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200 dark:border-slate-800/80 rounded-2xl shadow-xl shadow-indigo-950/5">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-cyan-500 p-0.5 shadow-lg shadow-indigo-500/20 flex items-center justify-center shrink-0">
             <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
-              <Brain className="w-6 h-6 text-indigo-400" />
+              <Brain className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400" />
             </div>
           </div>
           <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-lg font-extrabold text-slate-900 dark:text-white tracking-tight">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white tracking-tight">
                 {language === 'vi' ? 'Hồ Sơ Tư Duy & Cây Kỹ Năng' : 'Thinking Profile & Skill Tree'}
               </h1>
               <span className="px-2 py-0.5 text-[10px] font-mono font-bold bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 border border-indigo-500/20 rounded-md">
@@ -198,11 +210,11 @@ export const ThinkingProfileTab: React.FC<ThinkingProfileTabProps> = ({ language
         </div>
 
         {/* Period Selector & Confidence Pill */}
-        <div className="flex items-center flex-wrap gap-2.5">
+        <div className="flex items-center flex-wrap gap-2">
           {/* Confidence Badge */}
           {confidence && (
             <div
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold min-h-[40px] ${
                 confidence.level === 'HIGH'
                   ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
                   : confidence.level === 'MEDIUM'
@@ -211,7 +223,7 @@ export const ThinkingProfileTab: React.FC<ThinkingProfileTabProps> = ({ language
               }`}
               title={confidence.message}
             >
-              <Activity className="w-3.5 h-3.5" />
+              <Activity className="w-3.5 h-3.5 shrink-0" />
               <span>
                 {language === 'vi' ? 'Độ tin cậy: ' : 'Confidence: '}
                 {confidence.level === 'HIGH'
@@ -223,14 +235,14 @@ export const ThinkingProfileTab: React.FC<ThinkingProfileTabProps> = ({ language
             </div>
           )}
 
-          {/* Period Toggle Buttons */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold">
+          {/* Period Toggle Buttons (Touch targets >= 44px) */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold overflow-x-auto scrollbar-none">
             {(['7d', '30d', '90d', 'all'] as AnalyticsPeriod[]).map(p => (
               <button
                 key={p}
                 type="button"
                 onClick={() => setPeriod(p)}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                className={`min-h-[40px] px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                   period === p
                     ? 'bg-indigo-600 text-white shadow-sm font-bold'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -251,7 +263,8 @@ export const ThinkingProfileTab: React.FC<ThinkingProfileTabProps> = ({ language
             type="button"
             onClick={() => loadData(period)}
             title={language === 'vi' ? 'Làm mới dữ liệu' : 'Refresh data'}
-            className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 hover:bg-slate-200 dark:bg-slate-950 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-indigo-400 transition-all cursor-pointer"
+            aria-label={language === 'vi' ? 'Làm mới dữ liệu' : 'Refresh data'}
+            className="min-h-[40px] min-w-[40px] p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 hover:bg-slate-200 dark:bg-slate-950 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-indigo-400 transition-all cursor-pointer flex items-center justify-center active:scale-95"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
@@ -767,11 +780,18 @@ export const ThinkingProfileTab: React.FC<ThinkingProfileTabProps> = ({ language
 
       {/* ── SKILL LEVEL DETAIL MODAL / DRAWER ── */}
       {selectedSkillLevel && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedSkillLevel(null);
+          }}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-2xl max-w-lg w-full max-h-[88dvh] overflow-y-auto p-5 sm:p-6 shadow-2xl space-y-4 animate-slide-up sm:animate-in sm:fade-in sm:zoom-in-95 pb-[max(1.25rem,env(safe-area-inset-bottom,0px))]">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center font-mono font-bold text-indigo-400">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center font-mono font-bold text-indigo-400 shrink-0">
                   L{selectedSkillLevel.level}
                 </div>
                 <div>
@@ -784,7 +804,8 @@ export const ThinkingProfileTab: React.FC<ThinkingProfileTabProps> = ({ language
               <button
                 type="button"
                 onClick={() => setSelectedSkillLevel(null)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-all cursor-pointer"
+                className="min-h-[44px] min-w-[44px] text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-center font-bold active:scale-95"
+                aria-label={language === 'vi' ? 'Đóng chi tiết cấp độ' : 'Close level details'}
               >
                 ✕
               </button>

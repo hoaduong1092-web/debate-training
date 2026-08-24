@@ -12,9 +12,15 @@ import {
   TurnArgumentContext,
 } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
-import { VoiceRecorder } from './VoiceRecorder';
 import { AudioCheckModal } from './AudioCheckModal';
 import { PricingModal } from './PricingModal';
+import { MatchHeader } from './arena/MatchHeader';
+import { ArenaSetup } from './arena/ArenaSetup';
+import { SparringFeed } from './arena/SparringFeed';
+import { DebateInput } from './arena/DebateInput';
+import { CoachPanel } from './arena/CoachPanel';
+import { CoachBottomSheet } from './arena/CoachBottomSheet';
+import { ArgumentMapHUD } from './arena/ArgumentMapHUD';
 import { speakOpponentResponse, stopSpeaking } from '../utils/tts';
 import { Strings, Language } from '../lib/i18n';
 
@@ -356,6 +362,60 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
   const [isCompleted, setIsCompleted] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [showAudioCheckModal, setShowAudioCheckModal] = useState(false);
+  const [isCoachSheetOpen, setIsCoachSheetOpen] = useState(false);
+  const [showNewResponseIndicator, setShowNewResponseIndicator] = useState(false);
+  const isNearBottomRef = useRef(true);
+  const feedEndRef = useRef<HTMLDivElement>(null);
+  const prevTurnsCountRef = useRef(0);
+
+  // Smart scroll tracker: detect if user is near bottom
+  useEffect(() => {
+    let ticking = false;
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const scrollPos = window.innerHeight + window.scrollY;
+          const threshold = document.documentElement.scrollHeight - 280;
+          const isNear = scrollPos >= threshold;
+          isNearBottomRef.current = isNear;
+          if (isNear) {
+            setShowNewResponseIndicator(false);
+          }
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // When turns array increases: auto-scroll if near bottom, else show indicator
+  useEffect(() => {
+    if (turns.length > prevTurnsCountRef.current) {
+      if (isNearBottomRef.current) {
+        feedEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        setShowNewResponseIndicator(false);
+      } else {
+        setShowNewResponseIndicator(true);
+      }
+      prevTurnsCountRef.current = turns.length;
+    }
+  }, [turns.length]);
+
+  // Escape key handler for modals
+  useEffect(() => {
+    if (!showSummaryModal && !showAudioCheckModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showSummaryModal) setShowSummaryModal(false);
+        if (showAudioCheckModal) setShowAudioCheckModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showSummaryModal, showAudioCheckModal]);
 
   // Stable session reference to prevent duplicate history records
   const stableSessionIdRef = useRef<string>(sessionId || `session-${Date.now()}`);
@@ -896,22 +956,6 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
 
   const currentTurnData = turns[selectedTurn] || (turns.length > 0 ? turns[turns.length - 1] : null);
 
-  const formatTime = (s: number): string => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
-  };
-
-  // Color calculation for Neural Score Ring (INVARIANT-SCORE-02, INVARIANT-SCORE-04)
-  const getScoreColor = (score: number | null) => {
-    if (score === null) return { stroke: '#94a3b8', text: 'text-slate-500 dark:text-slate-400', bg: 'bg-slate-50 dark:bg-slate-500/10', border: 'border-slate-200 dark:border-slate-500/30' };
-    if (score >= 8.0) return { stroke: '#10b981', text: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-200 dark:border-emerald-500/30' };
-    if (score >= 6.0) return { stroke: '#f59e0b', text: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-500/10', border: 'border-amber-200 dark:border-amber-500/30' };
-    return { stroke: '#f43f5e', text: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-500/10', border: 'border-rose-200 dark:border-rose-500/30' };
-  };
-
-  const scoreTheme = currentTurnData ? getScoreColor(currentTurnData.logicScore) : getScoreColor(null);
-
   // Overall average score calculation for match summary (INVARIANT-SCORE-02)
   const scoredTurns = turns.filter((t) => typeof t.logicScore === 'number' && Number.isFinite(t.logicScore));
   const averageScore = scoredTurns.length > 0
@@ -928,929 +972,192 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
   return (
     <div className="w-full flex flex-col gap-5 animate-fade-in">
       {/* ── 1. MATCH HEADER & CONTROL DOCK ── */}
-      <div className="glass-panel rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 transition-all">
-        {/* Left: Format Selector & Audio Check */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              {isVi ? 'Thể thức:' : 'Format:'}
-            </span>
-            <div className="flex bg-slate-100 dark:bg-slate-950/80 p-1 rounded-xl border border-slate-200 dark:border-white/10 text-xs">
-              {(['WSDC', 'AP', 'BP'] as const).map((fmt) => (
-                <button
-                  key={fmt}
-                  type="button"
-                  onClick={() => setFormat(fmt)}
-                  className={`px-3 py-1 rounded-lg transition font-medium cursor-pointer ${
-                    format === fmt
-                      ? 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/30'
-                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
-                  }`}
-                >
-                  {fmt}
-                </button>
-              ))}
-            </div>
-
-            {/* Toggle Button for Format Rules */}
-            <button
-              type="button"
-              onClick={() => setShowFormatRules(!showFormatRules)}
-              className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors flex items-center gap-1 cursor-pointer font-medium px-2 py-1 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-500/10"
-              title={isVi ? 'Xem thông tin luật thi đấu thể thức này' : 'View tournament format rules'}
-            >
-              ℹ️ {showFormatRules ? (isVi ? 'Ẩn luật thi đấu' : 'Hide rules') : (isVi ? 'Xem luật thi đấu' : 'View rules')}
-            </button>
-          </div>
-
-          {/* Pre-match Audio Device Check Button */}
-          <button
-            type="button"
-            onClick={() => setShowAudioCheckModal(true)}
-            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 border border-indigo-200 dark:border-indigo-500/30 transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
-            title={isVi ? 'Kiểm tra Micro thu âm và Loa phát trước khi đấu' : 'Test microphone and speaker before debate'}
-          >
-            <Icons.Mic />
-            <span>🎤 {isVi ? 'Kiểm tra Âm thanh' : 'Audio Check'}</span>
-          </button>
-        </div>
-
-        {/* Center: Interactive Match Stepper */}
-        <div className="flex items-center gap-1.5 text-xs font-mono overflow-x-auto py-1 max-w-full">
-          {Array.from({ length: Math.max(3, turns.length) }, (_, i) => {
-            const turnNum = i + 1;
-            const isCompletedTurn = i < turns.length;
-            const isSelected = selectedTurn === i;
-
-            return (
-              <React.Fragment key={turnNum}>
-                {i > 0 && <span className="text-slate-300 dark:text-slate-700 mx-0.5">➔</span>}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isCompletedTurn) {
-                      setSelectedTurn(i);
-                    }
-                  }}
-                  disabled={!isCompletedTurn}
-                  className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 font-semibold text-xs ${
-                    isSelected
-                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 border border-indigo-400/40 ring-2 ring-indigo-500/30'
-                      : isCompletedTurn
-                      ? 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 border border-indigo-200 dark:border-indigo-500/30 cursor-pointer'
-                      : 'bg-slate-100 dark:bg-slate-900 text-slate-400 dark:text-slate-600 border border-slate-200 dark:border-slate-800 cursor-not-allowed opacity-75'
-                  }`}
-                  title={isCompletedTurn ? (isVi ? `Xem dữ liệu Lượt ${turnNum}` : `View Turn ${turnNum} data`) : (isVi ? `Lượt ${turnNum} (Chưa diễn ra)` : `Turn ${turnNum} (Upcoming)`)}
-                >
-                  {isCompletedTurn && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-                  )}
-                  <span>{isVi ? 'Lượt' : 'Turn'} {turnNum}</span>
-                </button>
-              </React.Fragment>
-            );
-          })}
-
-          <span className="text-slate-300 dark:text-slate-700 mx-0.5">➔</span>
-          <button
-            type="button"
-            onClick={() => {
-              if (turns.length > 0) {
-                if (isCompleted) {
-                  setShowSummaryModal(true);
-                } else {
-                  void handleEndSession();
-                }
-              } else {
-                alert(isVi ? 'Thực hiện ít nhất 1 lượt tranh biện để xem tổng kết.' : 'Complete at least 1 turn to view match summary.');
-              }
-            }}
-            className={`px-3 py-1 rounded-lg transition-all font-semibold text-xs flex items-center gap-1 ${
-              isCompleted
-                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 font-bold cursor-pointer'
-                : turns.length > 0
-                ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 cursor-pointer'
-                : 'bg-slate-100/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
-            }`}
-          >
-            <Icons.Flag />
-            <span>{isVi ? 'Tổng Kết' : 'Match Summary'}</span>
-          </button>
-        </div>
-
-        {/* Right: Actions & Stance Toggle */}
-        <div className="flex items-center gap-2">
-          {/* End Session Button */}
-          {turns.length > 0 && (
-            <button
-              type="button"
-              onClick={() => void handleEndSession()}
-              disabled={isLoading}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 border border-rose-200 dark:border-rose-500/30 transition flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-sm"
-              title={isVi ? 'Kết thúc và lưu phiên làm việc vào Lịch sử' : 'End session and save to History'}
-            >
-              <Icons.Flag />
-              <span>{isVi ? 'Kết Thúc Phiên' : 'End Match'}</span>
-            </button>
-          )}
-
-          {/* New Debate Button */}
-          {turns.length > 0 && (
-            <button
-              type="button"
-              onClick={handleStartNewDebate}
-              className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 transition active:scale-95 cursor-pointer"
-              title={isVi ? 'Bắt đầu phiên tranh biện mới' : 'Start new debate'}
-              aria-label={isVi ? 'Tạo phiên mới' : 'New debate'}
-            >
-              <Icons.RotateCcw />
-            </button>
-          )}
-
-          {/* Stance Toggle */}
-          <button
-            type="button"
-            onClick={() => setStance((s) => (s === 'AFFIRMATIVE' ? 'NEGATIVE' : 'AFFIRMATIVE'))}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-2 ${
-              stance === 'AFFIRMATIVE' ? 'neon-pill-affirmative' : 'neon-pill-negative'
-            }`}
-          >
-            <span className={`w-2 h-2 rounded-full ${stance === 'AFFIRMATIVE' ? 'bg-emerald-500 dark:bg-emerald-400 animate-pulse' : 'bg-rose-500 dark:bg-rose-400 animate-pulse'}`} />
-            <span>{stance === 'AFFIRMATIVE' ? (isVi ? 'Ủng Hộ (Government)' : 'Affirmative (Gov)') : (isVi ? 'Phản Đối (Opposition)' : 'Negative (Opp)')}</span>
-          </button>
-        </div>
-
-        {/* Toggleable Format Rules Info Card (Glassmorphism) */}
-        {showFormatRules && FORMAT_RULES[format] && (
-          <div className="w-full mt-3 p-4 glass-panel bg-indigo-950/20 border border-indigo-500/20 rounded-xl text-sm text-slate-700 dark:text-zinc-300 animate-fade-in-down transition-all">
-            <div className="flex items-center justify-between pb-2 mb-2 border-b border-indigo-500/20 text-xs">
-              <span className="font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
-                {isVi ? `Luật thi đấu chuẩn thể thức ${format}` : `Official Tournament Rules for ${format}`}
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowFormatRules(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold cursor-pointer"
-              >
-                ✕ {isVi ? 'Đóng' : 'Close'}
-              </button>
-            </div>
-            <ul className="space-y-2">
-              <li><strong>👥 {isVi ? 'Cấu trúc:' : 'Teams:'}</strong> {FORMAT_RULES[format].teams}</li>
-              <li><strong>⏱️ {isVi ? 'Thời gian:' : 'Timing:'}</strong> {FORMAT_RULES[format].time}</li>
-              <li><strong>🎯 {isVi ? 'Đặc trưng:' : 'Key features:'}</strong> {FORMAT_RULES[format].features}</li>
-              <li><strong>🌟 {isVi ? 'Phù hợp:' : 'Best for:'}</strong> {FORMAT_RULES[format].audience}</li>
-            </ul>
-          </div>
-        )}
-      </div>
+      <MatchHeader
+        format={format}
+        setFormat={setFormat}
+        showFormatRules={showFormatRules}
+        setShowFormatRules={setShowFormatRules}
+        onOpenAudioCheck={() => setShowAudioCheckModal(true)}
+        turnsCount={turns.length}
+        selectedTurn={selectedTurn}
+        setSelectedTurn={setSelectedTurn}
+        isCompleted={isCompleted}
+        onOpenSummary={() => {
+          if (turns.length > 0) {
+            if (isCompleted) {
+              setShowSummaryModal(true);
+            } else {
+              void handleEndSession();
+            }
+          } else {
+            alert(isVi ? 'Thực hiện ít nhất 1 lượt tranh biện để xem tổng kết.' : 'Complete at least 1 turn to view match summary.');
+          }
+        }}
+        onEndSession={() => void handleEndSession()}
+        onStartNewDebate={handleStartNewDebate}
+        stance={stance}
+        setStance={setStance}
+        isLoading={isLoading}
+        language={language}
+      />
 
       {/* ── 2. MAIN 2-COLUMN ARENA GRID ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* ── LEFT COLUMN: LIVE SPARRING STAGE (7 Cols) ── */}
         <section className="lg:col-span-7 flex flex-col gap-4">
           {/* Card 1: Motion Card with Glassmorphic Focus */}
-          <div className="glass-panel-elevated rounded-2xl p-5 relative overflow-hidden transition-all">
-            {/* Ambient Background Glow */}
-            <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+          <ArenaSetup
+            topic={topic}
+            format={format}
+            stance={stance}
+            onOpenMotionModal={() => setShowMotionModal(true)}
+            onOpenAssistant={onOpenAssistant ? (t, s) => {
+              stopSpeaking();
+              onOpenAssistant(t, s);
+            } : undefined}
+            isTimerRunning={isTimerRunning}
+            setIsTimerRunning={setIsTimerRunning}
+            speechSeconds={speechSeconds}
+            isProtectedTime={isProtectedTime}
+            poiStatus={poiStatus}
+            poiSecondsLeft={poiSecondsLeft}
+            onRequestPoi={() => {
+              setPoiStatus('ACCEPTED');
+              setPoiSecondsLeft(15);
+            }}
+            language={language}
+          />
 
-            <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/15 px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-500/30 flex items-center gap-1.5 shadow-sm">
-                <Icons.Sparkles />
-                <span>{isVi ? `Kiến Nghị Tranh Biện (${format})` : `DEBATE MOTION (${format})`}</span>
-              </span>
-
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* Nút Đổi Kiến Nghị / Mở Motion Hub */}
-                <button
-                  type="button"
-                  onClick={() => setShowMotionModal(true)}
-                  className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 border border-indigo-200 dark:border-indigo-500/30 transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
-                  title={isVi ? 'Đổi chủ đề tranh biện hoặc chọn từ thư viện kiến nghị WSDC/BP/AP' : 'Change topic or pick from WSDC/BP/AP curated library'}
-                >
-                  <Icons.Edit />
-                  <span>{isVi ? '🎯 Đổi Kiến Nghị' : '🎯 Change Motion'}</span>
-                </button>
-
-                {/* Nút Mở Trợ Lý AI Phân Tích */}
-                {onOpenAssistant && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      stopSpeaking();
-                      onOpenAssistant(topic, stance);
-                    }}
-                    className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-violet-50 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-500/25 border border-violet-200 dark:border-violet-500/30 transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
-                    title={isVi ? 'Mở Trợ lý AI để phân tích đa chiều và gợi ý dàn ý cho kiến nghị này' : 'Open AI Assistant for motion analysis and speech drafting'}
-                  >
-                    <Icons.Bot />
-                    <span>{isVi ? '🤖 Trợ Lý Phân Tích' : '🤖 AI Assistant'}</span>
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => setIsTimerRunning((r) => !r)}
-                  className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/80 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 transition flex items-center gap-1.5 cursor-pointer"
-                >
-                  {isTimerRunning ? <Icons.Pause /> : <Icons.Play />}
-                  <span>{isTimerRunning ? (isVi ? 'Dừng' : 'Pause') : (isVi ? 'Bấm Giờ' : 'Start Timer')}</span>
-                </button>
-                <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-950/70 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-white/5">
-                  {formatTime(speechSeconds)} / 8:00
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-2">
-              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 leading-snug tracking-wide">
-                {topic}
-              </h2>
-            </div>
-
-            {/* POI Safety Deck */}
-            <div className="mt-4 pt-3.5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs flex-wrap gap-2">
-              <div>
-                {isProtectedTime ? (
-                  <span className="neon-pill-amber px-3 py-1 rounded-lg font-medium flex items-center gap-1.5 text-[11px]">
-                    <Icons.Lock />
-                    <span>{isVi ? 'Thời gian an toàn (Không POI)' : 'Protected Time (No POI)'}</span>
-                  </span>
-                ) : (
-                  <span className="neon-pill-affirmative px-3 py-1 rounded-lg font-medium flex items-center gap-1.5 text-[11px]">
-                    <Icons.Bell />
-                    <span>{isVi ? 'Mở sàn chất vấn (POI Allowed)' : 'Active Floor (POI Available)'}</span>
-                  </span>
-                )}
-              </div>
-
-              {!isProtectedTime && poiStatus !== 'ACCEPTED' && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPoiStatus('ACCEPTED');
-                    setPoiSecondsLeft(15);
-                  }}
-                  className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-white dark:text-slate-950 font-bold rounded-xl shadow-lg shadow-amber-500/20 transition active:scale-95 text-xs cursor-pointer"
-                >
-                  {isVi ? 'Xin POI (15s)' : 'Request POI (15s)'}
-                </button>
-              )}
-            </div>
-
-            {/* POI Active 15s Countdown */}
-            {poiStatus === 'ACCEPTED' && (
-              <div className="mt-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-500/40 rounded-xl p-3 shadow-lg shadow-amber-500/10">
-                <div className="flex justify-between text-xs font-bold text-amber-700 dark:text-amber-300 mb-1.5">
-                  <span className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-                    {isVi ? 'CHẤT VẤN POI ĐANG DIỄN RA' : 'POI ACTIVE INTERACTION'}
-                  </span>
-                  <span className="font-mono text-sm">{poiSecondsLeft}s</span>
-                </div>
-                <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-950 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-amber-400 to-amber-500 transition-all duration-1000"
-                    style={{ width: `${(poiSecondsLeft / 15) * 100}%` }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Card 2: User's Argument for Selected Turn (If at least 1 turn exists) */}
-          {currentTurnData && (
-            <div className="glass-panel-elevated rounded-2xl p-5 border border-indigo-200 dark:border-indigo-500/30 shadow-md relative transition-all">
-              <div className="flex items-start gap-4">
-                {/* User Avatar Badge */}
-                <div className="w-11 h-11 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-600/30 shrink-0">
-                  <Icons.User />
-                </div>
-
-                {/* User Speech Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                        {isVi ? 'Luận Điểm Của Bạn' : 'Your Argument'}
-                      </h3>
-                      <span className="text-[10px] uppercase font-bold px-2 py-0.5 bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 rounded-md border border-indigo-200 dark:border-indigo-500/30 font-mono">
-                        {isVi ? 'Lượt' : 'Turn'} {currentTurnData.turnNumber}
-                      </span>
-                    </div>
-
-                    {/* Acoustic Telemetry Pills & Audio Playback (Voice mode only) */}
-                    <div className="flex items-center gap-2">
-                      {currentTurnData.wpm != null && (
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                          {currentTurnData.wpm} WPM
-                        </span>
-                      )}
-                      {currentTurnData.fillers != null && currentTurnData.fillers > 0 && (
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-amber-700 dark:text-amber-400">
-                          {currentTurnData.fillers} {isVi ? 'từ đệm' : 'fillers'}
-                        </span>
-                      )}
-                      {currentTurnData.audioUrl && (
-                        <button
-                          type="button"
-                          onClick={() => toggleUserAudioPlayback(currentTurnData.audioUrl!, selectedTurn)}
-                          className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-500/30 transition cursor-pointer font-semibold"
-                        >
-                          {userAudioPlayingTurn === selectedTurn ? <Icons.Pause /> : <Icons.Play />}
-                          <span>{userAudioPlayingTurn === selectedTurn ? (isVi ? 'Dừng nghe' : 'Pause') : (isVi ? 'Nghe lại' : 'Replay')}</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-50 dark:bg-slate-950/70 p-3.5 rounded-xl border border-slate-200 dark:border-white/5 text-sm text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">
-                    {currentTurnData.userText}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Card 3: AI Opponent Response for Selected Turn */}
-          <div className="glass-panel-elevated rounded-2xl p-5 border border-indigo-200 dark:border-indigo-500/30 shadow-xl shadow-indigo-500/5 relative transition-all">
-            <div className="flex items-start gap-4">
-              {/* Persona Avatar */}
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-cyan-500 p-0.5 shadow-lg shadow-indigo-500/30 shrink-0">
-                <div className="w-full h-full bg-white dark:bg-slate-950 rounded-[14px] flex items-center justify-center">
-                  <Icons.Bot />
-                </div>
-              </div>
-
-              {/* Persona Dialogue */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Sơn Tùng (AI Opponent)</h3>
-                    <span className="text-[10px] uppercase font-bold px-2 py-0.5 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-md border border-rose-200 dark:border-rose-500/20">
-                      {stance === 'AFFIRMATIVE' ? (isVi ? 'Phản đối' : 'NEGATIVE') : (isVi ? 'Ủng hộ' : 'AFFIRMATIVE')}
-                    </span>
-                    {currentTurnData && (
-                      <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
-                        ({isVi ? `Phản biện Lượt ${currentTurnData.turnNumber}` : `Rebuttal Turn ${currentTurnData.turnNumber}`})
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {inputMode === 'voice' && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAutoPlayTts((v) => {
-                            const next = !v;
-                            if (!next) {
-                              stopSpeaking();
-                            }
-                            try { localStorage.setItem('arena_autoplay_tts', String(next)); } catch {}
-                            return next;
-                          });
-                        }}
-                        className={`text-xs px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 cursor-pointer font-medium ${
-                          autoPlayTts
-                            ? 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/30'
-                            : 'bg-slate-100 dark:bg-slate-900 text-slate-500 border-slate-200 dark:border-slate-800'
-                        }`}
-                        title={isVi ? 'Bật/Tắt tự động phát âm khi AI đối thủ phản hồi (chế độ giọng nói)' : 'Toggle auto TTS voice for AI opponent (voice mode)'}
-                      >
-                        <span>🔊 {isVi ? `Tự phát âm: ${autoPlayTts ? 'Bật' : 'Tắt'}` : `Auto Audio: ${autoPlayTts ? 'On' : 'Off'}`}</span>
-                      </button>
-                    )}
-                    {currentTurnData?.opponentText && (
-                      <button
-                        type="button"
-                        onClick={() => handleTtsPlayback(currentTurnData.opponentText, currentTurnData.opponentAudioUrl)}
-                        className="text-xs text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-cyan-300 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 transition cursor-pointer"
-                      >
-                        {isTtsPlaying ? <Icons.VolumeX /> : <Icons.Volume />}
-                        <span>{isTtsPlaying ? (isVi ? 'Dừng đọc' : 'Stop') : (isVi ? 'Phát âm' : 'Listen')}</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="bg-slate-50 dark:bg-slate-950/70 p-3.5 rounded-xl border border-slate-200 dark:border-white/5 text-sm text-slate-800 dark:text-slate-300 leading-relaxed relative">
-                  {isLoading ? (
-                    <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 animate-pulse py-1">
-                      <span className="w-2 h-2 rounded-full bg-indigo-500 animate-ping" />
-                      <span>{isVi ? 'Đang thiết lập luận cứ phản biện và bẻ gãy giả định...' : 'Generating counterargument and deconstructing assumptions...'}</span>
-                    </div>
-                  ) : currentTurnData?.opponentText ? (
-                    currentTurnData.opponentText
-                  ) : (
-                    <span className="text-slate-500 dark:text-slate-400 italic">
-                      {isVi ? 'Hãy phát biểu luận điểm mở màn (Lượt 1) để bắt đầu phiên tranh biện đối kháng.' : 'Please deliver your opening argument (Turn 1) to begin the debate.'}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* Sparring Feed: User Argument & AI Opponent Response */}
+          <SparringFeed
+            currentTurnData={currentTurnData}
+            selectedTurn={selectedTurn}
+            stance={stance}
+            inputMode={inputMode}
+            autoPlayTts={autoPlayTts}
+            setAutoPlayTts={setAutoPlayTts}
+            isTtsPlaying={isTtsPlaying}
+            userAudioPlayingTurn={userAudioPlayingTurn}
+            toggleUserAudioPlayback={toggleUserAudioPlayback}
+            handleTtsPlayback={handleTtsPlayback}
+            isLoading={isLoading}
+            language={language}
+          />
 
           {/* Argument Map HUD (Contract Closure v1.1 — Cognitive & Navigation Scaffold) */}
-          {currentFinalDraft && currentFinalDraft.arguments && currentFinalDraft.arguments.length > 0 && (
-            <div className="glass-panel-elevated rounded-2xl p-4 md:p-5 border border-indigo-500/20 shadow-lg flex flex-col gap-3.5 transition-all">
-              {/* HUD Header */}
-              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2.5 flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                    <Icons.Target />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
-                      <span>{isVi ? 'Bản Đồ Luận Điểm (Argument Map)' : 'Argument Map HUD'}</span>
-                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
-                        {currentFinalDraft.arguments.length} {isVi ? 'luận điểm' : 'args'}
-                      </span>
-                    </h4>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                      {isVi ? 'Định vị tư duy • Chọn luận điểm để xem chi tiết hoặc nạp vào lượt phát biểu' : 'Cognitive scaffolding • Select an argument to inspect or load into turn'}
-                    </p>
-                  </div>
-                </div>
-
-                {onOpenAssistant && (
-                  <button
-                    type="button"
-                    onClick={() => onOpenAssistant(topic, stance)}
-                    className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <span>✏️ {isVi ? 'Chỉnh sửa bản thảo' : 'Edit draft'}</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Argument Navigation Pills */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
-                {currentFinalDraft.arguments.map((arg) => {
-                  const isDebated = debatedArgumentIds.has(arg.argumentId);
-                  const isFocused = arg.argumentId === activeArgumentId;
-                  const isTarget = arg.argumentId === targetArgumentId;
-
-                  return (
-                    <button
-                      key={arg.argumentId}
-                      type="button"
-                      onClick={() => setActiveArgumentId(arg.argumentId)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer border ${
-                        isFocused
-                          ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 border-indigo-400/40'
-                          : isDebated
-                          ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30'
-                          : 'bg-slate-100 dark:bg-slate-900/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-indigo-400/40'
-                      }`}
-                    >
-                      <span>
-                        {isDebated ? '✓ ' : isTarget ? '🎯 ' : ''}
-                        {isVi ? `LĐ ${arg.order}` : `Arg ${arg.order}`}
-                      </span>
-                      <span className="max-w-[120px] md:max-w-[180px] truncate font-normal opacity-90">
-                        {arg.claim}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Active Argument Focus Inspector */}
-              {(() => {
-                const focused = currentFinalDraft.arguments.find((a) => a.argumentId === activeArgumentId) || currentFinalDraft.arguments[0];
-                if (!focused) return null;
-                const isTarget = focused.argumentId === targetArgumentId;
-                const isDebated = debatedArgumentIds.has(focused.argumentId);
-
-                return (
-                  <div className="bg-slate-50 dark:bg-slate-950/60 p-3.5 rounded-xl border border-slate-200 dark:border-white/5 flex flex-col gap-2.5 text-xs">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-[10px]">
-                          {isVi ? `LUẬN ĐIỂM ${focused.order}` : `ARGUMENT ${focused.order}`}
-                        </span>
-                        {isDebated && (
-                          <span className="font-semibold text-emerald-600 dark:text-emerald-400 text-[10px]">
-                            • {isVi ? 'Đã tranh biện ở lượt trước' : 'Debated in prior turn'}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const toInsert = `${focused.claim}. ${focused.reasoning ? `Bởi vì ${focused.reasoning}. ` : ''}${focused.evidenceSuggestion ? `Dẫn chứng: ${focused.evidenceSuggestion}` : ''}`.trim();
-                            setInputText((prev) => (prev.trim() ? `${prev.trim()}\n\n${toInsert}` : toInsert));
-                            setInputMode('text');
-                          }}
-                          className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 font-bold transition flex items-center gap-1 cursor-pointer text-[11px]"
-                        >
-                          <span>⚡ {isVi ? 'Nạp Vào Ô Nhập' : 'Insert into Editor'}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setTargetArgumentId((prev) => (prev === focused.argumentId ? null : focused.argumentId))}
-                          className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1 cursor-pointer text-[11px] border ${
-                            isTarget
-                              ? 'bg-amber-500 text-white border-amber-400 shadow-sm'
-                              : 'bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-amber-400'
-                          }`}
-                        >
-                          <span>{isTarget ? (isVi ? '🎯 Đang là Mục Tiêu' : '🎯 Target Bound') : (isVi ? '📌 Gán Làm Mục Tiêu' : '📌 Bind Target')}</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-1 text-slate-800 dark:text-slate-200">
-                      <p className="font-semibold text-slate-900 dark:text-white">
-                        <strong>{isVi ? 'Luận điểm (Claim): ' : 'Claim: '}</strong>
-                        {focused.claim}
-                      </p>
-                      {focused.reasoning && (
-                        <p className="text-slate-600 dark:text-slate-400">
-                          <strong>{isVi ? 'Lý lẽ (Reasoning): ' : 'Reasoning: '}</strong>
-                          {focused.reasoning}
-                        </p>
-                      )}
-                      {focused.evidenceSuggestion && (
-                        <p className="text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20 p-2 rounded-lg border border-emerald-200 dark:border-emerald-500/20">
-                          <strong>📚 {isVi ? 'Dẫn chứng gợi ý: ' : 'Evidence: '}</strong>
-                          {focused.evidenceSuggestion}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          )}
+          <ArgumentMapHUD
+            currentFinalDraft={currentFinalDraft}
+            debatedArgumentIds={debatedArgumentIds}
+            activeArgumentId={activeArgumentId}
+            setActiveArgumentId={setActiveArgumentId}
+            targetArgumentId={targetArgumentId}
+            setTargetArgumentId={setTargetArgumentId}
+            onOpenAssistant={onOpenAssistant}
+            topic={topic}
+            stance={stance}
+            onInsertArgumentText={(toInsert) => {
+              setInputText((prev) => (prev.trim() ? `${prev.trim()}\n\n${toInsert}` : toInsert));
+              setInputMode('text');
+            }}
+            language={language}
+          />
 
           {/* Card 4: Action Console & Next Turn Input / Recorder */}
-          <div className="glass-panel-elevated rounded-2xl p-5 transition-all">
-            {/* Mode Selector & Turn Navigation Header */}
-            <div className="flex items-center justify-between mb-3.5 border-b border-slate-200 dark:border-slate-800 pb-3 flex-wrap gap-2">
-              <div className="flex gap-2 text-xs">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setInputMode('text');
-                    setAutoPlayTts(false);
-                    stopSpeaking();
-                    try { localStorage.setItem('arena_autoplay_tts', 'false'); } catch {}
-                  }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition font-semibold cursor-pointer ${
-                    inputMode === 'text'
-                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 border border-indigo-400/30'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800'
-                  }`}
-                >
-                  <Icons.Text />
-                  <span>{isVi ? 'Soạn Văn Bản' : 'Text Mode'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setInputMode('voice');
-                    setAutoPlayTts(true);
-                    try { localStorage.setItem('arena_autoplay_tts', 'true'); } catch {}
-                  }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition font-semibold cursor-pointer ${
-                    inputMode === 'voice'
-                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 border border-indigo-400/30'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800'
-                  }`}
-                >
-                  <Icons.Mic />
-                  <span>{isVi ? 'Phát Biểu Giọng Nói' : 'Voice Recording'}</span>
-                </button>
-              </div>
+          <DebateInput
+            inputMode={inputMode}
+            setInputMode={setInputMode}
+            setAutoPlayTts={setAutoPlayTts}
+            turns={turns}
+            selectedTurn={selectedTurn}
+            setSelectedTurn={setSelectedTurn}
+            inputText={inputText}
+            setInputText={setInputText}
+            onSendArgument={handleSendArgument}
+            isLoading={isLoading}
+            isCheckingEntitlement={isCheckingEntitlement}
+            voiceEntitlement={voiceEntitlement}
+            onCheckVoiceEntitlement={checkVoiceEntitlement}
+            onRefreshUser={refreshUser}
+            onOpenPricingModal={() => setIsPricingModalOpen(true)}
+            language={language}
+          />
 
-              {/* Turn selector buttons */}
-              {turns.length > 0 && (
-                <div className="flex items-center gap-1.5 text-xs">
-                  <span className="text-slate-500 text-[11px] mr-0.5">{isVi ? 'Xem Lượt:' : 'View Turn:'}</span>
-                  {turns.map((t, idx) => (
-                    <button
-                      key={t.turnNumber}
-                      type="button"
-                      onClick={() => setSelectedTurn(idx)}
-                      className={`w-7 h-7 text-xs font-bold rounded-lg transition cursor-pointer ${
-                        selectedTurn === idx
-                          ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 border border-indigo-400/40'
-                          : 'bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
-                      }`}
-                    >
-                      {t.turnNumber}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Input / Recorder Area */}
-            {inputMode === 'text' ? (
-              <div className="flex flex-col gap-3">
-                <textarea
-                  rows={3}
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  placeholder={isVi ? `Nhập luận cứ của bạn cho Lượt ${turns.length + 1} theo cấu trúc C-R-E (Claim, Reasoning, Evidence)...` : `State your argument for Turn ${turns.length + 1} following C-R-E (Claim, Reasoning, Evidence)...`}
-                  className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl p-3.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 resize-none outline-none transition"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                      e.preventDefault();
-                      void handleSendArgument();
-                    }
-                  }}
-                />
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-500">{isVi ? 'Mẹo: Nhấn Ctrl + Enter để gửi' : 'Tip: Press Ctrl + Enter to submit'}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleSendArgument()}
-                    disabled={isLoading || !inputText.trim()}
-                    className="px-5 py-2.5 shimmer-btn disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-lg transition flex items-center gap-2 active:scale-95 cursor-pointer"
-                  >
-                    <span>{isLoading ? (isVi ? 'Đang phân tích...' : 'Analyzing...') : (isVi ? `Gửi Luận Điểm (Lượt ${turns.length + 1})` : `Submit Argument (Turn ${turns.length + 1})`)}</span>
-                    <Icons.Send />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="py-1 space-y-3">
-                {isCheckingEntitlement ? (
-                  <div className="py-8 text-center text-xs text-slate-500 animate-pulse flex items-center justify-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-indigo-500 animate-ping" />
-                    <span>{isVi ? 'Đang kiểm tra quyền hạn phát biểu Voice AI...' : 'Verifying Voice AI entitlement...'}</span>
-                  </div>
-                ) : voiceEntitlement && !voiceEntitlement.allowed ? (
-                  /* STATE G: QUOTA EXCEEDED */
-                  <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-center space-y-3">
-                    <div className="text-2xl">⚠️</div>
-                    <h4 className="text-sm font-bold text-amber-700 dark:text-amber-400">
-                      {isVi ? 'Hạn Ngạch Giọng Nói Đã Hết (Quota Exceeded)' : 'Voice AI Quota Exceeded'}
-                    </h4>
-                    <p className="text-xs text-slate-600 dark:text-slate-300 max-w-md mx-auto">
-                      {isVi
-                        ? 'Bạn đã sử dụng hết số phút Voice AI khả dụng trong chu kỳ hiện tại. Hãy nạp thêm gói Voice Boost hoặc nâng cấp để tiếp tục phát biểu trực tiếp.'
-                        : 'Your available voice minutes are fully exhausted. Top up with Voice Boost or upgrade your tier to continue.'}
-                    </p>
-                    <div className="flex justify-center gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => setIsPricingModalOpen(true)}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md transition active:scale-95 cursor-pointer"
-                      >
-                        ⚡ {isVi ? 'Nạp Voice Boost (15k / 49k)' : 'Top Up Voice Boost'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setInputMode('text')}
-                        className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl transition cursor-pointer"
-                      >
-                        {isVi ? 'Chuyển Sang Soạn Văn Bản' : 'Switch to Text Mode'}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  /* STATE B-F: ENTITLED */
-                  <>
-                    {voiceEntitlement && (
-                      <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-[11px] font-medium text-slate-700 dark:text-slate-300">
-                        <div className="flex items-center gap-1.5">
-                          {voiceEntitlement.source === 'VIP' ? (
-                            <span className="text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1">
-                              👑 VIP Pass: Không trừ quota
-                            </span>
-                          ) : (
-                            <span className="font-semibold">
-                              💎 {isVi ? 'Khả dụng:' : 'Available:'} {voiceEntitlement.availableMinutes ?? 0} {isVi ? 'phút' : 'mins'}
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-slate-500 font-mono text-[10px]">
-                          {isVi ? 'Tối đa 15 phút / phiên' : 'Max 15 min / session'}
-                        </span>
-                      </div>
-                    )}
-
-                    <VoiceRecorder
-                      key={`voice-turn-${turns.length + 1}`}
-                      language={language}
-                      currentTurn={turns.length + 1}
-                      onTranscriptReady={(text) => setInputText(text)}
-                      onRecordingComplete={(transcript, metrics) => {
-                        void handleSendArgument(
-                          transcript,
-                          {
-                            wpm: metrics.wpm,
-                            fillerCount: metrics.fillerCount,
-                            durationMs: metrics.durationMs,
-                            tier: metrics.tier ?? undefined,
-                            stt_source: metrics.stt_source ?? undefined,
-                          },
-                          metrics.audioUrl,
-                        );
-                        void checkVoiceEntitlement();
-                        void refreshUser();
-                      }}
-                    />
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+          {/* Anchor for Smart Auto-Scroll */}
+          <div ref={feedEndRef} className="h-0 pointer-events-none" />
         </section>
 
-        {/* ── RIGHT COLUMN: LOGIC COACH HUD (5 Cols) ── */}
-        <section className="lg:col-span-5 flex flex-col gap-4">
-          <div className="glass-panel-elevated rounded-2xl p-5 transition-all">
-            {/* HUD Header */}
-            <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-3">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-500/15 px-2.5 py-1 rounded-lg border border-purple-200 dark:border-purple-500/30 flex items-center gap-1.5 shadow-sm">
-                <Icons.Brain />
-                <span>Logic Coach HUD {currentTurnData ? `(${isVi ? 'Lượt' : 'Turn'} ${currentTurnData.turnNumber})` : ''}</span>
-              </span>
-              <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">{isVi ? 'Chuẩn Sư phạm v16' : 'Pedagogical Standard v16'}</span>
-            </div>
-
-            {currentTurnData ? (
-              <div className="space-y-3.5">
-                {/* 1. Neural Score Radial Banner */}
-                <div className={`p-4 rounded-xl border ${scoreTheme.border} ${scoreTheme.bg} flex items-center justify-between shadow-sm`}>
-                  <div>
-                    <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">{isVi ? `Điểm Đánh Giá C-R-E (Lượt ${currentTurnData.turnNumber})` : `C-R-E Evaluation Score (Turn ${currentTurnData.turnNumber})`}</div>
-                    <div className={`text-2xl font-black font-mono mt-0.5 ${scoreTheme.text}`}>
-                      {currentTurnData.logicScore !== null ? (
-                        <>
-                          {currentTurnData.logicScore.toFixed(1)} <span className="text-xs font-sans text-slate-500 dark:text-slate-400 font-normal">/ 10.0</span>
-                        </>
-                      ) : (
-                        <span className="text-sm font-sans text-slate-400 dark:text-slate-500 font-normal">{isVi ? 'Không có điểm' : 'N/A'}</span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Circular Score Gauge */}
-                  <div className="relative w-12 h-12 flex items-center justify-center">
-                    <svg className="w-12 h-12 transform -rotate-90" viewBox="0 0 36 36">
-                      <path
-                        className="text-slate-200 dark:text-slate-800"
-                        strokeWidth="3.5"
-                        stroke="currentColor"
-                        fill="none"
-                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                      />
-                      <path
-                        stroke={scoreTheme.stroke}
-                        strokeWidth="3.5"
-                        strokeDasharray={currentTurnData.logicScore !== null ? `${Math.round(currentTurnData.logicScore * 10)}, 100` : '0, 100'}
-                        strokeLinecap="round"
-                        fill="none"
-                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                      />
-                    </svg>
-                    <span className={`absolute text-xs font-bold font-mono ${scoreTheme.text}`}>
-                      {currentTurnData.logicScore !== null ? `${Math.round(currentTurnData.logicScore * 10)}%` : '--'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 2. C-R-E Breakdown Accordion Cards */}
-                <div className="space-y-2.5 text-xs">
-                  {/* Claim */}
-                  <div className="bg-cyan-50/80 dark:bg-cyan-950/20 border border-cyan-200 dark:border-cyan-500/30 p-3 rounded-xl">
-                    <div className="font-bold text-cyan-700 dark:text-cyan-300 mb-1 flex items-center gap-1.5">
-                      <Icons.Target />
-                      <span>Claim ({isVi ? 'Luận điểm' : 'Core Claim'})</span>
-                    </div>
-                    <div className="text-slate-800 dark:text-slate-200 leading-relaxed">{currentTurnData.cre.claim}</div>
-                  </div>
-
-                  {/* Reasoning */}
-                  <div className="bg-indigo-50/80 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-500/30 p-3 rounded-xl">
-                    <div className="font-bold text-indigo-700 dark:text-indigo-300 mb-1 flex items-center gap-1.5">
-                      <Icons.Brain />
-                      <span>Reasoning ({isVi ? 'Lập luận' : 'Logical Reasoning'})</span>
-                    </div>
-                    <div className="text-slate-800 dark:text-slate-200 leading-relaxed">{currentTurnData.cre.reasoning}</div>
-                  </div>
-
-                  {/* Evidence */}
-                  <div className="bg-teal-50/80 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-500/30 p-3 rounded-xl">
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="font-bold text-teal-700 dark:text-teal-300 flex items-center gap-1.5">
-                        <Icons.BarChart />
-                        <span>Evidence ({isVi ? 'Dẫn chứng' : 'Empirical Evidence'})</span>
-                      </div>
-                      <div className="text-amber-500 dark:text-amber-400 font-mono text-[11px]">
-                        {'★'.repeat(currentTurnData.evidenceStar || 4)}{'☆'.repeat(5 - (currentTurnData.evidenceStar || 4))}
-                      </div>
-                    </div>
-                    <div className="text-slate-800 dark:text-slate-200 leading-relaxed">{currentTurnData.cre.evidence}</div>
-                  </div>
-                </div>
-
-                {/* 3. Fallacy Radar */}
-                {currentTurnData.fallacies.length > 0 && (
-                  <div className="bg-rose-50/80 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-500/40 p-3 rounded-xl shadow-sm">
-                    <div className="text-xs font-bold text-rose-700 dark:text-rose-300 mb-1.5 flex items-center gap-1.5">
-                      <Icons.AlertTriangle />
-                      <span>{isVi ? 'Cảnh báo ngụy biện phát hiện:' : 'Detected Fallacy Warnings:'}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {currentTurnData.fallacies.map((fal, i) => (
-                        <span key={i} className="text-[10px] bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-200 px-2.5 py-0.5 rounded-md border border-rose-300 dark:border-rose-700/50 font-medium">
-                          {fal}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* 4. Acoustic DSP Telemetry (Voice mode only) */}
-                {currentTurnData.wpm != null && (
-                  <div className="bg-slate-100 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 p-3 rounded-xl flex items-center justify-between text-xs font-medium">
-                    <div>
-                      <span className="text-slate-500 dark:text-slate-400">{isVi ? 'Tốc độ: ' : 'Pace: '}</span>
-                      <span className="text-slate-800 dark:text-slate-200 font-bold font-mono">{currentTurnData.wpm} WPM</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 dark:text-slate-400">{isVi ? 'Từ đệm: ' : 'Fillers: '}</span>
-                      <span className="text-amber-600 dark:text-amber-400 font-bold font-mono">{currentTurnData.fillers || 0} {isVi ? 'từ' : 'wpm'}</span>
-                    </div>
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
-                      currentTurnData.wpm >= 120 && currentTurnData.wpm <= 165
-                        ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20'
-                        : currentTurnData.wpm > 165
-                        ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-500/20'
-                        : 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/20'
-                    }`}>
-                      {currentTurnData.wpm >= 120 && currentTurnData.wpm <= 165
-                        ? (isVi ? 'Chuẩn Tốc Độ' : 'Optimal Pace')
-                        : currentTurnData.wpm > 165
-                        ? (isVi ? 'Nói Quá Nhanh' : 'Too Fast')
-                        : (isVi ? 'Nói Hơi Chậm' : 'Too Slow')}
-                    </span>
-                  </div>
-                )}
-
-                {/* 5. Suggestions */}
-                {currentTurnData.suggestions.length > 0 && (
-                  <div className="bg-indigo-50/80 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-500/20 p-3 rounded-xl">
-                    <div className="text-xs font-bold text-indigo-700 dark:text-indigo-300 mb-1.5 flex items-center gap-1.5">
-                      <Icons.Sparkles />
-                      <span>{isVi ? 'Khuyến nghị nâng tầm lập luận:' : 'Actionable Coaching Recommendations:'}</span>
-                    </div>
-                    <ul className="text-xs text-slate-700 dark:text-slate-300 space-y-1 pl-4 list-disc">
-                      {currentTurnData.suggestions.map((sug, i) => (
-                        <li key={i} className="leading-relaxed">
-                          {sug}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* Welcome Preview when empty */
-              <div className="py-8 px-4 flex flex-col gap-4 text-xs">
-                <div className="text-center">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center mx-auto mb-3 text-white shadow-lg shadow-indigo-500/30 border border-indigo-400/30">
-                    <Icons.Brain />
-                  </div>
-                  <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                    {isVi ? 'Sẵn Sàng Chẩn Đoán Tư Duy' : 'Ready for Cognitive Diagnostics'}
-                  </h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    {isVi ? 'Hệ thống sẽ tự động bóc tách và phản hồi theo chuẩn Sư phạm v16 ngay khi bạn gửi lượt phát biểu đầu tiên.' : 'The system will automatically extract and evaluate your speech against pedagogical standards as soon as you submit your first turn.'}
-                  </p>
-                </div>
-
-                <div className="space-y-2.5 border-t border-slate-200 dark:border-slate-800 pt-3.5">
-                  <div className="bg-slate-100 dark:bg-slate-950/60 p-3 rounded-xl border border-slate-200 dark:border-white/5 flex items-start gap-3">
-                    <Icons.Target />
-                    <div>
-                      <div className="font-bold text-cyan-700 dark:text-cyan-300 text-xs">{isVi ? 'Chẩn Đoán C-R-E Thời Gian Thực' : 'Real-time C-R-E Diagnostics'}</div>
-                      <div className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">{isVi ? 'Đánh giá tính mạch lạc của Claim, Reasoning và Evidence.' : 'Evaluates coherence and rigor of Claim, Reasoning, and Evidence.'}</div>
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-100 dark:bg-slate-950/60 p-3 rounded-xl border border-slate-200 dark:border-white/5 flex items-start gap-3">
-                    <Icons.BarChart />
-                    <div>
-                      <div className="font-bold text-teal-700 dark:text-teal-300 text-xs">{isVi ? 'Phát Hiện Ngụy Biện & DSP Voice' : 'Fallacy Detection & Voice DSP'}</div>
-                      <div className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">{isVi ? 'Bắt lỗi Strawman, Ad Hominem, đo tốc độ WPM & từ đệm.' : 'Catches Strawman, Ad Hominem, measures WPM tempo and filler words.'}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+        {/* ── RIGHT COLUMN: LOGIC COACH HUD (5 Cols, Desktop Only) ── */}
+        <section className="hidden lg:flex lg:col-span-5 flex-col gap-4">
+          <CoachPanel
+            currentTurnData={currentTurnData}
+            language={language}
+          />
         </section>
       </div>
+
+      {/* ── FLOATING "↓ CÓ PHẢN HỒI MỚI" INDICATOR (Mobile Only) ── */}
+      {showNewResponseIndicator && (
+        <div className="fixed bottom-[calc(5.2rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 z-30 lg:hidden animate-fade-in-up">
+          <button
+            type="button"
+            onClick={() => {
+              feedEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+              setShowNewResponseIndicator(false);
+            }}
+            className="min-h-[44px] px-4 py-2.5 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold text-xs shadow-2xl shadow-indigo-600/50 border border-indigo-300/40 flex items-center gap-2 active:scale-95 transition cursor-pointer"
+            aria-label={isVi ? 'Cuộn xuống phản hồi mới của đối thủ AI' : 'Scroll down to new response'}
+          >
+            <span className="text-sm">↓</span>
+            <span>{isVi ? 'Có phản hồi mới' : 'New Response'}</span>
+          </button>
+        </div>
+      )}
+
+      {/* ── MOBILE FLOATING COACH TRIGGER (< lg) ── */}
+      <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] right-3.5 z-30 lg:hidden animate-fade-in">
+        <button
+          type="button"
+          onClick={() => setIsCoachSheetOpen(true)}
+          className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-purple-500/30 text-slate-800 dark:text-slate-100 shadow-xl shadow-purple-500/20 active:scale-95 transition cursor-pointer min-h-[44px]"
+          aria-label={isVi ? 'Mở Logic Coach chẩn đoán tư duy' : 'Open Logic Coach diagnostics'}
+        >
+          <div className="w-7 h-7 rounded-xl bg-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/>
+              <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/>
+              <path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/>
+              <path d="M12 18v4"/>
+            </svg>
+          </div>
+          <div className="flex flex-col text-left">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+              Logic Coach
+            </span>
+            <span className="text-xs font-black font-mono flex items-center gap-1">
+              {currentTurnData && currentTurnData.logicScore !== null ? (
+                <>
+                  <span className={currentTurnData.logicScore >= 8 ? 'text-emerald-600 dark:text-emerald-400' : currentTurnData.logicScore >= 6 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'}>
+                    {currentTurnData.logicScore.toFixed(1)}/10
+                  </span>
+                  <span className="text-[9px] font-normal text-slate-400">🔍</span>
+                </>
+              ) : (
+                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  {isVi ? 'Xem phân tích' : 'Diagnostics'}
+                </span>
+              )}
+            </span>
+          </div>
+        </button>
+      </div>
+
+      {/* ── MOBILE COACH BOTTOM SHEET ── */}
+      <CoachBottomSheet
+        isOpen={isCoachSheetOpen}
+        onClose={() => setIsCoachSheetOpen(false)}
+        currentTurnData={currentTurnData}
+        language={language}
+      />
 
       {/* ── 3. MATCH SUMMARY / END SESSION MODAL ── */}
       {showSummaryModal && (
