@@ -21,7 +21,7 @@ import { DebateInput } from './arena/DebateInput';
 import { CoachPanel } from './arena/CoachPanel';
 import { CoachBottomSheet } from './arena/CoachBottomSheet';
 import { ArgumentMapHUD } from './arena/ArgumentMapHUD';
-import { speakOpponentResponse, stopSpeaking, stopActiveSpeech, isAudioUnlocked, logVoiceDebateDiagnostics } from '../utils/tts';
+import { speakOpponentResponse, stopActiveSpeech, isAudioUnlocked, isActuallyPlaying, onPlaybackStateChange, logVoiceDebateDiagnostics } from '../utils/tts';
 import { Strings, Language } from '../lib/i18n';
 
 // --- INLINE SVG ICONS (CLEAN & ADAPTIVE) ---
@@ -338,7 +338,8 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
 
   useEffect(() => {
     if (inputMode === 'voice') {
-      setAutoPlayTts(true);
+      // Only check voice entitlement when switching to voice mode.
+      // Do NOT override autoPlayTts — respect the user's saved preference.
       void checkVoiceEntitlement();
     }
   }, [inputMode, checkVoiceEntitlement]);
@@ -357,6 +358,17 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
     }
     return true; // Default auto-play enabled for hands-free voice debate
   });
+
+  // ═══ PLAYBACK STATE MACHINE SYNC ═══
+  // Subscribe to the authoritative playback state from tts.ts.
+  // This is the ONLY place isTtsPlaying should be set — never from onEnd callbacks.
+  useEffect(() => {
+    const unsubscribe = onPlaybackStateChange((state) => {
+      const isPlaying = state === 'playing_audio' || state === 'playing_speech';
+      setIsTtsPlaying(isPlaying);
+    });
+    return unsubscribe;
+  }, []);
 
   // Track the turn index that has already initiated speech to prevent duplicate playback on re-render
   const lastSpokenTurnRef = useRef<number>(-1);
@@ -574,7 +586,6 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
   // Cut off speech and user audio playback when switching turns in Arena
   useEffect(() => {
     stopActiveSpeech();
-    setIsTtsPlaying(false);
     if (userAudioRef.current) {
       userAudioRef.current.pause();
       setUserAudioPlayingTurn(null);
@@ -585,7 +596,6 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
   useEffect(() => {
     if (inputMode === 'text') {
       stopActiveSpeech();
-      setIsTtsPlaying(false);
     }
   }, [inputMode]);
 
@@ -659,34 +669,32 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
   }, [sessionId, topic, stance, user?.id]);
 
   // Guaranteed Opponent Speech Playback (Auto-play & Explicit play)
+  // UI state (isTtsPlaying) is driven by the playback state machine subscription,
+  // NOT by onEnd/onStart callbacks here.
   const playOpponentTts = useCallback((text: string, audioUrl?: string | null) => {
-    stopSpeaking();
-    setIsTtsPlaying(true);
-    const res = speakOpponentResponse(text, {
+    speakOpponentResponse(text, {
       lang: 'vi-VN',
       gender: 'male',
       voiceId: 'sonTung',
       rate: 1.0,
       pitch: 1.0,
       audioUrl: audioUrl || undefined,
-      onEnd: () => setIsTtsPlaying(false),
+      // onEnd/onStart NOT needed here — playback state machine drives UI
     });
-    if (res !== 'ok') {
-      setIsTtsPlaying(false);
-    }
   }, []);
 
-  // Manual Toggle button helper (Play / Pause)
-  // When stopping: uses stopActiveSpeech which increments the playback generation,
-  // ensuring no in-flight async callback can restart playback after Stop is pressed.
+  // Manual Toggle button helper (Play / Stop)
+  // CRITICAL: Uses isActuallyPlaying() from the playback controller as the
+  // AUTHORITATIVE source, not the React isTtsPlaying boolean which can be stale.
   const handleTtsPlayback = useCallback((text: string, audioUrl?: string | null) => {
-    if (isTtsPlaying) {
+    if (isActuallyPlaying()) {
+      // Audio is truly playing — STOP it
       stopActiveSpeech();
-      setIsTtsPlaying(false);
     } else {
+      // Audio is not playing — START it
       playOpponentTts(text, audioUrl);
     }
-  }, [isTtsPlaying, playOpponentTts]);
+  }, [playOpponentTts]);
 
   // --- SAVE SESSION TO HISTORY (STRICT UPSERT TO PREVENT DUPLICATES) ---
   const saveSessionToHistory = useCallback(async (currentTurns = turns, sid = sessionId, isFinal = false) => {
@@ -1059,7 +1067,7 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
             stance={stance}
             onOpenMotionModal={() => setShowMotionModal(true)}
             onOpenAssistant={onOpenAssistant ? (t, s) => {
-              stopSpeaking();
+              stopActiveSpeech();
               onOpenAssistant(t, s);
             } : undefined}
             isTimerRunning={isTimerRunning}
