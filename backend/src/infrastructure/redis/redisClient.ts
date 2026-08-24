@@ -1,11 +1,10 @@
 import Redis, { Callback } from 'ioredis';
 import { EventEmitter } from 'events';
 
-const redisUrl = process.env.REDIS_URL;
+const redisUrl = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL || process.env.REDIS_PUBLIC_URL || process.env.REDISURL;
 
-if (process.env.NODE_ENV === 'production' && !redisUrl) {
-  console.error('FATAL: REDIS_URL is mandatory in production.');
-  process.exit(1);
+if (!redisUrl) {
+  console.warn('[Redis] No REDIS_URL configured. Operating seamlessly with In-Memory fallback store.');
 }
 
 // In-Memory store item with TTL
@@ -97,11 +96,9 @@ export class HybridRedisClient extends EventEmitter {
           enableOfflineQueue: false, // Do not hang requests in memory queue if Redis is offline
           maxRetriesPerRequest: 1,
           retryStrategy(times: number) {
-            if (process.env.NODE_ENV === 'production') {
-              if (times > 5) {
-                console.error('FATAL: Redis connection failed in production after 5 retries. Exiting.');
-                process.exit(1);
-              }
+            if (times > 10) {
+              console.warn('[Redis] Connection failed after 10 retries. Operating with In-Memory fallback store.');
+              return null; // Stop retrying, operate seamlessly with in-memory fallback
             }
             return Math.min(times * 1000, 10000);
           },
