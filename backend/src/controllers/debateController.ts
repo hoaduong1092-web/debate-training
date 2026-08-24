@@ -41,6 +41,11 @@ const LOGIC_COACH_MODEL = getLogicCoachModel();
 const MAX_TURNS_PER_SESSION = 60;
 const DEMO_USER_ID = '22222222-2222-2222-2222-222222222222';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isValidUuid(id: unknown): id is string {
+  return typeof id === 'string' && UUID_REGEX.test(id);
+}
+
 // ─── Session Creation ────────────────────────────────────────────────────────
 
 /**
@@ -355,8 +360,8 @@ export async function handleDebateMessage(req: Request, res: Response) {
     const { userId: bodyUserId, content, stance, topic, coachHistory, voiceMetrics, argumentContext } = req.body;
     const userId = authUserId || bodyUserId;
 
-    if (typeof rawSessionId !== 'string' || !rawSessionId) {
-      return res.status(400).json({ error: 'Invalid or missing sessionId' });
+    if (typeof rawSessionId !== 'string' || !rawSessionId || !isValidUuid(rawSessionId)) {
+      return res.status(404).json({ error: 'SESSION_NOT_FOUND', message: 'Debate session not found or invalid ID format.' });
     }
 
     const sessionId: string = rawSessionId;
@@ -863,8 +868,8 @@ export async function listUserSessions(req: Request, res: Response): Promise<voi
 export async function getSessionDetail(req: Request, res: Response): Promise<void> {
   try {
     const sessionId = String(req.params['sessionId'] ?? '').trim();
-    if (!sessionId) {
-      res.status(400).json({ error: 'Missing sessionId param' });
+    if (!sessionId || !isValidUuid(sessionId)) {
+      res.status(404).json({ error: 'Session not found' });
       return;
     }
 
@@ -985,8 +990,8 @@ export async function deleteSession(req: Request, res: Response) {
     const sessionId = String(req.params.sessionId ?? '');
     const userId = (req as { userId?: string }).userId ?? (req.body as { userId?: string })?.userId;
 
-    if (!sessionId) {
-      return res.status(400).json({ error: 'Missing sessionId' });
+    if (!sessionId || !isValidUuid(sessionId)) {
+      return res.status(404).json({ error: 'Session not found' });
     }
 
     const session = await prisma.debateSession.findUnique({
@@ -1020,8 +1025,8 @@ export async function completeSession(req: Request, res: Response) {
       (req as { userId?: string }).userId ??
       (req.body as { userId?: string })?.userId;
 
-    if (!sessionId) {
-      return res.status(400).json({ error: 'Missing sessionId' });
+    if (!sessionId || !isValidUuid(sessionId)) {
+      return res.status(404).json({ error: 'Session not found' });
     }
 
     const session = await prisma.debateSession.findUnique({

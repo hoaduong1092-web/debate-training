@@ -418,7 +418,7 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
   }, [showSummaryModal, showAudioCheckModal]);
 
   // Stable session reference to prevent duplicate history records
-  const stableSessionIdRef = useRef<string>(sessionId || `session-${Date.now()}`);
+  const stableSessionIdRef = useRef<string>(sessionId || '');
 
   // Audio player for user's own recording
   const [userAudioPlayingTurn, setUserAudioPlayingTurn] = useState<number | null>(null);
@@ -501,7 +501,7 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
           if (parsed.topic) setTopic(parsed.topic);
           if (parsed.stance) setStance(parsed.stance);
           if (parsed.format) setFormat(parsed.format);
-          if (parsed.sessionId) {
+          if (parsed.sessionId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(parsed.sessionId)) {
             setSessionId(parsed.sessionId);
             stableSessionIdRef.current = parsed.sessionId;
           }
@@ -602,46 +602,40 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
   // Auto-init session if empty (strictly reused across all turns)
   const ensureSession = useCallback(async () => {
     const activeId = stableSessionIdRef.current || sessionId;
-    if (activeId && !activeId.startsWith('session-')) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (activeId && isUuid.test(activeId)) {
       stableSessionIdRef.current = activeId;
       if (sessionId !== activeId) setSessionId(activeId);
       return activeId;
     }
     const targetUserId = user?.id || '22222222-2222-2222-2222-222222222222';
-    try {
-      const res = await createDebateSession({
-        userId: targetUserId,
-        topic,
-        character_id: 'sonTung',
-        user_side: stance,
-      });
-      if (res.success && res.session?.id) {
-        const oldId = stableSessionIdRef.current;
-        setSessionId(res.session.id);
-        stableSessionIdRef.current = res.session.id;
+    const res = await createDebateSession({
+      userId: targetUserId,
+      topic,
+      character_id: 'sonTung',
+      user_side: stance,
+    });
+    if (res.success && res.session?.id) {
+      const oldId = stableSessionIdRef.current;
+      setSessionId(res.session.id);
+      stableSessionIdRef.current = res.session.id;
 
-        // Clean up temporary session entry if saved before API returned
-        if (oldId && oldId !== res.session.id) {
-          try {
-            const raw = localStorage.getItem('local_debate_history_v15');
-            if (raw) {
-              const list = JSON.parse(raw);
-              if (Array.isArray(list)) {
-                localStorage.setItem('local_debate_history_v15', JSON.stringify(list.filter((s: any) => s.id !== oldId)));
-              }
+      // Clean up temporary session entry if saved before API returned
+      if (oldId && oldId !== res.session.id) {
+        try {
+          const raw = localStorage.getItem('local_debate_history_v15');
+          if (raw) {
+            const list = JSON.parse(raw);
+            if (Array.isArray(list)) {
+              localStorage.setItem('local_debate_history_v15', JSON.stringify(list.filter((s: any) => s.id !== oldId)));
             }
-          } catch {}
-        }
-
-        return res.session.id;
+          }
+        } catch {}
       }
-    } catch {
-      const fallbackId = stableSessionIdRef.current || `session-${Date.now()}`;
-      setSessionId(fallbackId);
-      stableSessionIdRef.current = fallbackId;
-      return fallbackId;
+
+      return res.session.id;
     }
-    return stableSessionIdRef.current;
+    throw new Error('Không thể khởi tạo phiên tranh biện trên máy chủ.');
   }, [sessionId, topic, stance, user?.id]);
 
   // Guaranteed Opponent Speech Playback (Auto-play & Explicit play)
@@ -819,10 +813,16 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
           voiceMetrics: voiceMetrics || undefined,
         });
       } catch (sendErr: any) {
-        // If session was completed on backend or invalid, auto-renew clean session and retry
+        // If session was completed on backend, not found, or invalid UUID, auto-renew clean session and retry
         const errStr = String(sendErr?.message || sendErr?.error || '');
-        if (errStr.includes('SESSION_COMPLETED') || sendErr?.status === 400) {
-          console.warn('[Arena] Previous session completed on backend, auto-renewing fresh session...');
+        if (
+          errStr.includes('SESSION_COMPLETED') ||
+          errStr.includes('SESSION_NOT_FOUND') ||
+          errStr.includes('UUID') ||
+          sendErr?.status === 400 ||
+          sendErr?.status === 404
+        ) {
+          console.warn('[Arena] Session invalid or expired on backend, auto-renewing fresh session...');
           stableSessionIdRef.current = '';
           setSessionId('');
           currentSid = await ensureSession();
