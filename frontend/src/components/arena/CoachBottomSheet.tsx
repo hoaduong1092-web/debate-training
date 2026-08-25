@@ -35,7 +35,7 @@ export const CoachBottomSheet: React.FC<CoachBottomSheetProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center md:hidden"
+      className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="coach-sheet-title"
@@ -47,10 +47,10 @@ export const CoachBottomSheet: React.FC<CoachBottomSheetProps> = ({
         aria-hidden="true"
       />
 
-      {/* Bottom Sheet Drawer */}
-      <div className="relative z-10 w-full max-h-[88dvh] rounded-t-3xl bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col animate-slide-up pb-[env(safe-area-inset-bottom,16px)]">
-        {/* Grabber Handle */}
-        <div className="w-full pt-2.5 pb-1 flex justify-center cursor-grab shrink-0">
+      {/* Bottom Sheet Drawer on Mobile / Centered Modal Dialog on Desktop */}
+      <div className="relative z-10 w-full md:max-w-2xl max-h-[88dvh] rounded-t-3xl md:rounded-3xl bg-white dark:bg-slate-950 border-t md:border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col animate-slide-up pb-[env(safe-area-inset-bottom,16px)] md:pb-4">
+        {/* Grabber Handle (Mobile only) */}
+        <div className="w-full pt-2.5 pb-1 flex md:hidden justify-center cursor-grab shrink-0">
           <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full" />
         </div>
 

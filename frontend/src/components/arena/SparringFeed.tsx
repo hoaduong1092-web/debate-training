@@ -16,6 +16,7 @@ export interface SparringFeedProps {
   handleTtsPlayback: (text: string, audioUrl?: string | null) => void;
   isLoading: boolean;
   language?: 'vi' | 'en';
+  onOpenCoachDiagnostics?: () => void;
 }
 
 export const SparringFeed: React.FC<SparringFeedProps> = ({
@@ -31,6 +32,7 @@ export const SparringFeed: React.FC<SparringFeedProps> = ({
   handleTtsPlayback,
   isLoading,
   language = 'vi',
+  onOpenCoachDiagnostics,
 }) => {
   const isVi = language === 'vi';
 
@@ -64,6 +66,25 @@ export const SparringFeed: React.FC<SparringFeedProps> = ({
 
               {/* Acoustic Telemetry & Audio Replay Button (touch target >= 44px) */}
               <div className="flex items-center gap-1.5 flex-wrap">
+                {currentTurnData.logicScore !== null && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenCoachDiagnostics?.()}
+                    className={`min-h-[44px] px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer active:scale-95 transition shadow-sm border ${
+                      currentTurnData.logicScore >= 8.0
+                        ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30'
+                        : currentTurnData.logicScore >= 6.0
+                        ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/30'
+                        : 'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-500/30'
+                    }`}
+                    title={isVi ? 'Nhấn để xem phân tích Logic Coach chi tiết' : 'Click to view Logic Coach detailed feedback'}
+                    aria-label={isVi ? `Điểm Logic Coach: ${currentTurnData.logicScore.toFixed(1)}/10. Nhấn để xem chi tiết.` : `Logic Coach score: ${currentTurnData.logicScore.toFixed(1)}/10. Click to view details.`}
+                  >
+                    <span>🧠 Logic Coach:</span>
+                    <span>{currentTurnData.logicScore.toFixed(1)}/10</span>
+                    <span className="text-[10px] text-slate-400">🔍</span>
+                  </button>
+                )}
                 {currentTurnData.wpm != null && (
                   <span className="px-2 py-1 rounded-lg text-[10px] font-mono font-bold bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
                     {currentTurnData.wpm} WPM
@@ -231,6 +252,25 @@ export const SparringFeed: React.FC<SparringFeedProps> = ({
 
                   {/* Acoustic Telemetry Pills & Audio Playback (Voice mode only) */}
                   <div className="flex items-center gap-2">
+                    {currentTurnData.logicScore !== null && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenCoachDiagnostics?.()}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer active:scale-95 transition shadow-sm border ${
+                          currentTurnData.logicScore >= 8.0
+                            ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30'
+                            : currentTurnData.logicScore >= 6.0
+                            ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/30'
+                            : 'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-500/30'
+                        }`}
+                        title={isVi ? 'Nhấn để xem phân tích Logic Coach chi tiết' : 'Click to view Logic Coach detailed feedback'}
+                        aria-label={isVi ? `Điểm Logic Coach: ${currentTurnData.logicScore.toFixed(1)}/10. Nhấn để xem chi tiết.` : `Logic Coach score: ${currentTurnData.logicScore.toFixed(1)}/10. Click to view details.`}
+                      >
+                        <span className="text-purple-600 dark:text-purple-400">🧠 Logic Coach:</span>
+                        <span>{currentTurnData.logicScore.toFixed(1)}/10</span>
+                        <span className="text-[10px] text-slate-400">🔍</span>
+                      </button>
+                    )}
                     {currentTurnData.wpm != null && (
                       <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
                         {currentTurnData.wpm} WPM

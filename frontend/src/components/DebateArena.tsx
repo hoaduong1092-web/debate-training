@@ -1112,6 +1112,7 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
             handleTtsPlayback={handleTtsPlayback}
             isLoading={isLoading}
             language={language}
+            onOpenCoachDiagnostics={() => setIsCoachSheetOpen(true)}
           />
 
           {/* Argument Map HUD (Contract Closure v1.1 — Cognitive & Navigation Scaffold) */}
@@ -1187,8 +1188,8 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
           <div ref={feedEndRef} className="h-0 pointer-events-none" />
         </section>
 
-        {/* ── RIGHT COLUMN: LOGIC COACH HUD (5 Cols, Desktop Only) ── */}
-        <section className="hidden lg:flex lg:col-span-5 flex-col gap-4">
+        {/* ── RIGHT COLUMN: LOGIC COACH HUD (5 Cols, Desktop Only, Sticky) ── */}
+        <section className="hidden lg:flex lg:col-span-5 lg:sticky lg:top-4 flex-col gap-4">
           <CoachPanel
             currentTurnData={currentTurnData}
             language={language}
