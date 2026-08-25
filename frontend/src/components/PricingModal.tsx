@@ -320,7 +320,25 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  // Auto-poll payment order status when on checkout screen
+  useEffect(() => {
+    if (!isOpen || !selectedItem || !checkoutData?.orderCode || fulfillmentSuccess) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const statusRes = await api.fetchPaymentOrderStatus(checkoutData.orderCode);
+        if (statusRes.isPaid) {
+          clearInterval(interval);
+          setFulfillmentSuccess(true);
+          await refreshUser();
+        }
+      } catch {
+        // Silently ignore polling network errors
+      }
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [isOpen, selectedItem, checkoutData?.orderCode, fulfillmentSuccess, refreshUser]);
 
   const isPlanMatchCycle = (plan: DynamicPlan, cycle: 'monthly' | 'yearly') => {
     const pCycle = (plan.billingCycle || plan.billing_cycle || '').toLowerCase();
@@ -410,26 +428,6 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
     }
   };
 
-  // Auto-poll payment order status when on checkout screen
-  useEffect(() => {
-    if (!selectedItem || !checkoutData?.orderCode || fulfillmentSuccess) return;
-
-    const interval = setInterval(async () => {
-      try {
-        const statusRes = await api.fetchPaymentOrderStatus(checkoutData.orderCode);
-        if (statusRes.isPaid) {
-          clearInterval(interval);
-          setFulfillmentSuccess(true);
-          await refreshUser();
-        }
-      } catch {
-        // Silently ignore polling network errors
-      }
-    }, 2500);
-
-    return () => clearInterval(interval);
-  }, [selectedItem, checkoutData?.orderCode, fulfillmentSuccess, refreshUser]);
-
   // Handle Manual Status Check
   const handleCheckStatus = async () => {
     if (!checkoutData?.orderCode || checkoutLoading) return;
@@ -481,6 +479,8 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
       setTimeout(() => setCopiedMemo(false), 2000);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 backdrop-blur-xl p-2 sm:p-4 animate-fade-in">
