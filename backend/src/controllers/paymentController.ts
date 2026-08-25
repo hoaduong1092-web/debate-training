@@ -313,7 +313,7 @@ export async function createCheckoutSession(
       itemType = 'CREDIT_PACK';
     } else if (parsedPlan) {
       // Lookup plan from Database (Single Source of Truth - COM-INVARIANT-02)
-      const dbPlan = await prisma.subscriptionPlan.findFirst({
+      let dbPlan = await prisma.subscriptionPlan.findFirst({
         where: {
           OR: [
             { id: parsedPlan },
@@ -322,6 +322,34 @@ export async function createCheckoutSession(
           isActive: true,
         },
       });
+
+      // Self-heal / Auto-seed plan if missing from database
+      if (!dbPlan) {
+        const planDef = getPlanDefinition(parsedPlan);
+        if (planDef) {
+          try {
+            dbPlan = await prisma.subscriptionPlan.upsert({
+              where: { id: planDef.code },
+              update: { isActive: true },
+              create: {
+                id: planDef.code,
+                name: planDef.displayName,
+                billingCycle: planDef.durationDays > 30 ? 'yearly' : 'monthly',
+                priceVnd: planDef.listPriceVnd,
+                durationDays: planDef.durationDays,
+                textTurnsQuota: planDef.limits.text,
+                voiceMinsQuota: planDef.limits.voice,
+                assistantQuota: planDef.limits.assistant,
+                isActive: true,
+                isPopular: planDef.code.includes('STANDARD'),
+                sortOrder: planDef.code.includes('BASIC') ? 1 : planDef.code.includes('STANDARD') ? 3 : 5,
+              },
+            });
+          } catch (upsertErr) {
+            console.warn('[PLAN_SELF_HEAL_WARN]', upsertErr);
+          }
+        }
+      }
 
       if (!dbPlan) {
         res.status(400).json({
@@ -613,7 +641,7 @@ export async function handleSandboxDirectUpgrade(
       itemCodeOut = packDef.code;
       amountVnd = packDef.listPriceVnd;
     } else if (parsedPlan) {
-      const dbPlan = await prisma.subscriptionPlan.findFirst({
+      let dbPlan = await prisma.subscriptionPlan.findFirst({
         where: {
           OR: [
             { id: parsedPlan },
@@ -622,6 +650,34 @@ export async function handleSandboxDirectUpgrade(
           isActive: true,
         },
       });
+
+      // Self-heal / Auto-seed plan if missing from database
+      if (!dbPlan) {
+        const planDef = getPlanDefinition(parsedPlan);
+        if (planDef) {
+          try {
+            dbPlan = await prisma.subscriptionPlan.upsert({
+              where: { id: planDef.code },
+              update: { isActive: true },
+              create: {
+                id: planDef.code,
+                name: planDef.displayName,
+                billingCycle: planDef.durationDays > 30 ? 'yearly' : 'monthly',
+                priceVnd: planDef.listPriceVnd,
+                durationDays: planDef.durationDays,
+                textTurnsQuota: planDef.limits.text,
+                voiceMinsQuota: planDef.limits.voice,
+                assistantQuota: planDef.limits.assistant,
+                isActive: true,
+                isPopular: planDef.code.includes('STANDARD'),
+                sortOrder: planDef.code.includes('BASIC') ? 1 : planDef.code.includes('STANDARD') ? 3 : 5,
+              },
+            });
+          } catch (upsertErr) {
+            console.warn('[PLAN_SELF_HEAL_WARN]', upsertErr);
+          }
+        }
+      }
 
       if (!dbPlan) {
         res.status(400).json({

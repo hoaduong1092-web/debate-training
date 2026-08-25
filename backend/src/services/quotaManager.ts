@@ -263,9 +263,10 @@ export async function provisionSubscription(
       });
     }
 
-    const durationDays = dbPlan?.durationDays ?? 30;
+    const planDef = getPlanDefinition(planCode);
+    const durationDays = dbPlan?.durationDays ?? planDef?.durationDays ?? 30;
     const durationMs = durationDays * 24 * 60 * 60 * 1000;
-    const targetPlanId = dbPlan ? dbPlan.id : 'BASIC_MONTHLY';
+    const targetPlanId = dbPlan ? dbPlan.id : (planDef?.code ?? 'BASIC_MONTHLY');
 
     // Look up existing subscription to check for Same-Plan Early Renewal (C1-C Contract)
     const existingSub = await tx.userSubscription.findUnique({
@@ -294,10 +295,10 @@ export async function provisionSubscription(
     }
 
     const limits: PlanQuotaLimits = {
-      text: dbPlan?.textTurnsQuota ?? 30,
-      voice: dbPlan?.voiceMinsQuota ?? 15,
-      audio: dbPlan?.voiceMinsQuota ?? 15,
-      assistant: dbPlan?.assistantQuota ?? 10,
+      text: dbPlan?.textTurnsQuota ?? planDef?.limits.text ?? 30,
+      voice: dbPlan?.voiceMinsQuota ?? planDef?.limits.voice ?? 15,
+      audio: dbPlan?.voiceMinsQuota ?? planDef?.limits.voice ?? 15,
+      assistant: dbPlan?.assistantQuota ?? planDef?.limits.assistant ?? 10,
     };
 
     // Atomically upsert subscription (Preserves duration on early renewal)
