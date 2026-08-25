@@ -25,6 +25,10 @@ export interface DebateInputProps {
   onCheckVoiceEntitlement: () => Promise<void> | void;
   onRefreshUser: () => Promise<void> | void;
   onOpenPricingModal: () => void;
+  isCompleted?: boolean;
+  onOpenSummary?: () => void;
+  onStartNewDebate?: () => void;
+  onNavigateToHistory?: () => void;
   language?: 'vi' | 'en';
 }
 
@@ -44,6 +48,10 @@ export const DebateInput: React.FC<DebateInputProps> = ({
   onCheckVoiceEntitlement,
   onRefreshUser,
   onOpenPricingModal,
+  isCompleted = false,
+  onOpenSummary,
+  onStartNewDebate,
+  onNavigateToHistory,
   language = 'vi',
 }) => {
   const isVi = language === 'vi';
@@ -65,6 +73,58 @@ export const DebateInput: React.FC<DebateInputProps> = ({
       mobileTextareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, 250);
   };
+
+  if (isCompleted) {
+    return (
+      <div className="glass-panel-elevated rounded-2xl p-5 md:p-6 border border-emerald-500/30 bg-emerald-500/5 transition-all text-center space-y-4">
+        <div className="w-12 h-12 mx-auto rounded-2xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-2xl shadow-md shadow-emerald-500/20">
+          🏆
+        </div>
+        <div>
+          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+            {isVi ? 'Phiên Tranh Biện Đã Kết Thúc' : 'Debate Session Completed'}
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-1 leading-relaxed">
+            {isVi
+              ? `Phiên đấu gồm ${turns.length} lượt tranh luận đã hoàn thành và được lưu an toàn vào Lịch sử & Báo cáo Tư Duy.`
+              : `Match of ${turns.length} turns completed and saved to History & Thinking Profile.`}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+          {onOpenSummary && (
+            <button
+              type="button"
+              onClick={onOpenSummary}
+              className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 flex items-center gap-2 active:scale-95 transition cursor-pointer min-h-[44px]"
+            >
+              <span>📊 {isVi ? 'Xem Tổng Kết Trận Đấu' : 'View Match Summary'}</span>
+            </button>
+          )}
+
+          {onNavigateToHistory && (
+            <button
+              type="button"
+              onClick={onNavigateToHistory}
+              className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs border border-slate-200 dark:border-slate-800 transition active:scale-95 cursor-pointer min-h-[44px]"
+            >
+              <span>📜 {isVi ? 'Xem Trong Lịch Sử' : 'View in History'}</span>
+            </button>
+          )}
+
+          {onStartNewDebate && (
+            <button
+              type="button"
+              onClick={onStartNewDebate}
+              className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs border border-slate-200 dark:border-slate-800 transition active:scale-95 cursor-pointer min-h-[44px]"
+            >
+              <span>🔥 {isVi ? 'Bắt Đầu Phiên Mới' : 'Start New Match'}</span>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="glass-panel-elevated rounded-2xl p-4 md:p-5 transition-all">

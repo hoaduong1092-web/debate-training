@@ -40,6 +40,7 @@ const suites = [
   { name: 'Frontend UI Precision & Entitlement B9 Suite', file: 'src/__tests__/phaseB9FrontendContract.test.ts' },
   { name: 'Final Acceptance & E2E B10 Suite', file: 'src/__tests__/phaseB10FinalAcceptance.test.ts' },
   { name: 'Phase C1 Commercial & Transaction Portal Suite', file: 'src/__tests__/phaseC1Commercial.test.ts' },
+  { name: 'Voice Real Quota & End Session E2E Suite', file: 'src/__tests__/voiceRealQuotaE2E.test.ts' },
 ];
 
 const results: SuiteResult[] = [];

@@ -19,6 +19,8 @@ export interface CreateSessionRequest {
   topic: string;
   character_id: string;
   user_side: DebateStance;
+  input_mode?: 'text' | 'voice';
+  inputMode?: 'text' | 'voice';
 }
 
 export interface SessionInfo {
@@ -228,15 +230,18 @@ export interface CompleteSessionResponse {
     turn_count: number;
     updated_at: string;
   };
+  voice_session?: VoiceSessionDTO | null;
+  quota?: QuotaInfo | null;
 }
 
 /**
  * PUT /api/v1/arena/sessions/:sessionId/complete
- * Marks a session as COMPLETED. Idempotent. Zero LLM calls. Zero quota deduction.
+ * Marks a session as COMPLETED and finalizes any linked VoiceSession atomically.
  */
 export async function completeDebateSession(
   sessionId: string,
   userId: string,
+  actualDurationMs?: number,
 ): Promise<CompleteSessionResponse> {
   const token = getAuthToken();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -245,7 +250,7 @@ export async function completeDebateSession(
   const response = await fetch(`${API_BASE_URL}/arena/sessions/${sessionId}/complete`, {
     method: 'PUT',
     headers,
-    body: JSON.stringify({ userId }),
+    body: JSON.stringify({ userId, actualDurationMs }),
   });
 
   let payload: unknown;

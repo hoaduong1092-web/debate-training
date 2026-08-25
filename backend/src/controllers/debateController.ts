@@ -125,7 +125,7 @@ export async function createDebateSession(req: Request, res: Response) {
         });
       }
 
-      // 2. Guard against concurrent active voice sessions
+      // 2. Guard against concurrent active voice sessions (with stale session auto-cleanup)
       const activeSession = await prisma.voiceSession.findFirst({
         where: {
           userId,
@@ -134,12 +134,31 @@ export async function createDebateSession(req: Request, res: Response) {
       });
 
       if (activeSession) {
-        return res.status(409).json({
-          error: 'VOICE_SESSION_ALREADY_ACTIVE',
-          code: 'VOICE_SESSION_ALREADY_ACTIVE',
-          message: 'Bạn đang có một phiên Voice đang hoạt động. Vui lòng hoàn thành phiên hiện tại trước khi bắt đầu phiên mới.',
-          details: { activeSessionId: activeSession.id },
-        });
+        const isStale = Date.now() - activeSession.startedAt.getTime() > (activeSession.maxAllowedMs || 900_000);
+        if (isStale) {
+          try {
+            await VoiceSessionService.finalizeVoiceSession({
+              voiceSessionId: activeSession.id,
+              userId,
+              reason: 'TIMEOUT_AUTO_FINALIZED',
+            });
+          } catch {
+            try {
+              await VoiceSessionService.abortVoiceSession({
+                voiceSessionId: activeSession.id,
+                userId,
+                reason: 'TIMEOUT_ABORTED',
+              });
+            } catch {}
+          }
+        } else {
+          return res.status(409).json({
+            error: 'VOICE_SESSION_ALREADY_ACTIVE',
+            code: 'VOICE_SESSION_ALREADY_ACTIVE',
+            message: 'Bạn đang có một phiên Voice đang hoạt động. Vui lòng hoàn thành phiên hiện tại trước khi bắt đầu phiên mới.',
+            details: { activeSessionId: activeSession.id },
+          });
+        }
       }
 
       // 3. Compute server-enforced max duration cap
@@ -729,6 +748,47 @@ export async function handleDebateMessage(req: Request, res: Response) {
           ...(sessionCompleted ? { status: 'COMPLETED' } : {}),
         },
       });
+
+      if (sessionCompleted && session.inputMode === 'voice') {
+        try {
+          const linkedVoice = await prisma.voiceSession.findFirst({
+            where: {
+              userId,
+              debateSessionId: sessionId,
+              status: { in: ['ACTIVE', 'FINALIZING'] },
+            },
+          });
+          if (linkedVoice) {
+            let totalVoiceDuration = 0;
+            const allTurns = await prisma.debateTranscript.findMany({
+              where: { sessionId, speakerType: 'user' },
+              select: { fallaciesDetected: true },
+            });
+            for (const ut of allTurns) {
+              if (Array.isArray(ut.fallaciesDetected)) {
+                for (const item of ut.fallaciesDetected) {
+                  if (typeof item === 'string' && item.startsWith('__voice__')) {
+                    try {
+                      const p = JSON.parse(item.slice(9));
+                      if (typeof p.duration_ms === 'number' && Number.isFinite(p.duration_ms) && p.duration_ms > 0) {
+                        totalVoiceDuration += Math.round(p.duration_ms);
+                      }
+                    } catch {}
+                  }
+                }
+              }
+            }
+            await VoiceSessionService.finalizeVoiceSession({
+              voiceSessionId: linkedVoice.id,
+              userId,
+              actualDurationMs: totalVoiceDuration,
+              reason: 'MAX_TURNS_COMPLETED',
+            });
+          }
+        } catch (autoFinalizeErr) {
+          console.warn('[VOICE_AUTO_FINALIZE_WARN]', autoFinalizeErr);
+        }
+      }
     } catch (scoreUpdateErr) {
       console.warn('[SCORE_UPDATE_ERROR]', scoreUpdateErr);
     }
@@ -1021,9 +1081,9 @@ export async function deleteSession(req: Request, res: Response) {
 export async function completeSession(req: Request, res: Response) {
   try {
     const sessionId = String(req.params.sessionId ?? '');
-    const userId =
-      (req as { userId?: string }).userId ??
-      (req.body as { userId?: string })?.userId;
+    const authUserId = (req as any).userId;
+    const bodyUserId = req.body?.userId;
+    const userId = authUserId || bodyUserId;
 
     if (!sessionId || !isValidUuid(sessionId)) {
       return res.status(404).json({ error: 'Session not found' });
@@ -1034,6 +1094,9 @@ export async function completeSession(req: Request, res: Response) {
       include: {
         transcripts: {
           orderBy: { turnNumber: 'asc' },
+        },
+        voiceSessions: {
+          where: { status: { in: ['ACTIVE', 'FINALIZING'] } },
         },
       },
     });
@@ -1046,6 +1109,76 @@ export async function completeSession(req: Request, res: Response) {
       return res.status(403).json({ error: 'Forbidden: session belongs to another user' });
     }
 
+    // 1. Calculate speech duration from transcripts or payload
+    let totalSpeechDurationMs = 0;
+    for (const tr of session.transcripts) {
+      if (tr.speakerType === 'user' && Array.isArray(tr.fallaciesDetected)) {
+        for (const item of tr.fallaciesDetected) {
+          if (typeof item === 'string' && item.startsWith('__voice__')) {
+            try {
+              const parsed = JSON.parse(item.slice(9));
+              if (typeof parsed.duration_ms === 'number' && Number.isFinite(parsed.duration_ms) && parsed.duration_ms > 0) {
+                totalSpeechDurationMs += Math.round(parsed.duration_ms);
+              }
+            } catch {}
+          }
+        }
+      }
+    }
+
+    const clientSuppliedDuration =
+      typeof req.body?.actualDurationMs === 'number' &&
+      Number.isFinite(req.body.actualDurationMs) &&
+      req.body.actualDurationMs >= 0
+        ? Math.round(req.body.actualDurationMs)
+        : null;
+
+    const effectiveVoiceDurationMs =
+      clientSuppliedDuration !== null && clientSuppliedDuration > totalSpeechDurationMs
+        ? clientSuppliedDuration
+        : totalSpeechDurationMs;
+
+    // 2. Finalize any active linked VoiceSession
+    let finalizedVoiceSession = null;
+    const activeVoiceSessions = session.voiceSessions || [];
+    for (const vSess of activeVoiceSessions) {
+      try {
+        const finalResult = await VoiceSessionService.finalizeVoiceSession({
+          voiceSessionId: vSess.id,
+          userId: session.userId,
+          actualDurationMs: effectiveVoiceDurationMs,
+          reason: 'DEBATE_SESSION_COMPLETED',
+        });
+        finalizedVoiceSession = finalResult.session;
+      } catch (voiceFinalizeErr) {
+        console.error('[VOICE_FINALIZE_ERROR_IN_COMPLETE_SESSION]', voiceFinalizeErr);
+      }
+    }
+
+    // If inputMode is voice but no linked voiceSession in relation, find any active voiceSession for this user
+    if (!finalizedVoiceSession && session.inputMode === 'voice') {
+      const userActiveVoice = await prisma.voiceSession.findFirst({
+        where: {
+          userId: session.userId,
+          status: { in: ['ACTIVE', 'FINALIZING'] },
+        },
+      });
+      if (userActiveVoice) {
+        try {
+          const finalResult = await VoiceSessionService.finalizeVoiceSession({
+            voiceSessionId: userActiveVoice.id,
+            userId: session.userId,
+            actualDurationMs: effectiveVoiceDurationMs,
+            reason: 'DEBATE_SESSION_COMPLETED',
+          });
+          finalizedVoiceSession = finalResult.session;
+        } catch (vErr) {
+          console.error('[USER_VOICE_FINALIZE_ERROR]', vErr);
+        }
+      }
+    }
+
+    // 3. Mark debate session completed
     if (session.status !== 'COMPLETED') {
       await prisma.debateSession.update({
         where: { id: sessionId },
@@ -1056,6 +1189,11 @@ export async function completeSession(req: Request, res: Response) {
     const userTurns = session.transcripts.filter((t) => t.speakerType === 'user');
     const turnCount = userTurns.length;
 
+    // Fetch updated user quota to return in response
+    const updatedQuota = await prisma.userQuota.findUnique({
+      where: { userId: session.userId },
+    });
+
     return res.json({
       success: true,
       session: {
@@ -1065,6 +1203,14 @@ export async function completeSession(req: Request, res: Response) {
         turn_count: turnCount,
         updated_at: new Date().toISOString(),
       },
+      voice_session: finalizedVoiceSession,
+      quota: updatedQuota
+        ? {
+            textTurnsRemaining: updatedQuota.textTurnsRemaining,
+            voiceMinsRemaining: updatedQuota.voiceMinsRemaining,
+            assistantRemaining: updatedQuota.assistantRemaining,
+          }
+        : null,
     });
   } catch (error: any) {
     console.error('[COMPLETE_SESSION_ERROR]', error);

@@ -653,6 +653,7 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
       topic,
       character_id: 'sonTung',
       user_side: stance,
+      input_mode: inputMode,
     });
     if (res.success && res.session?.id) {
       const oldId = stableSessionIdRef.current;
@@ -710,11 +711,14 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
     if (currentTurns.length === 0) return;
     const targetUserId = user?.id || '22222222-2222-2222-2222-222222222222';
     const finalSid = sid || sessionId || stableSessionIdRef.current;
+    const totalVoiceMs = currentTurns
+      .filter((t) => typeof t.durationMs === 'number' && t.durationMs > 0)
+      .reduce((sum, t) => sum + Math.round(t.durationMs!), 0);
 
     // 1. Only call completeDebateSession on backend when session is genuinely completed
     if (isFinal && finalSid && !finalSid.startsWith('session-')) {
       try {
-        await completeDebateSession(finalSid, targetUserId);
+        await completeDebateSession(finalSid, targetUserId, totalVoiceMs > 0 ? totalVoiceMs : undefined);
       } catch (err) {
         console.warn('[Arena] completeDebateSession API warning:', err);
       }
@@ -985,7 +989,7 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
 
   const handleEndSession = async () => {
     if (turns.length === 0) {
-      alert('Bạn cần thực hiện ít nhất 1 lượt tranh biện trước khi kết thúc phiên.');
+      alert(isVi ? 'Bạn cần thực hiện ít nhất 1 lượt tranh biện trước khi kết thúc phiên.' : 'Complete at least 1 turn before ending the session.');
       return;
     }
     setIsLoading(true);
@@ -993,6 +997,8 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
       await saveSessionToHistory(turns, sessionId, true);
       setIsCompleted(true);
       setShowSummaryModal(true);
+      await refreshUser();
+      await checkVoiceEntitlement();
     } catch (err) {
       console.error('[Arena] Error completing session:', err);
       setIsCompleted(true);
@@ -1143,8 +1149,39 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
             onCheckVoiceEntitlement={checkVoiceEntitlement}
             onRefreshUser={refreshUser}
             onOpenPricingModal={() => setIsPricingModalOpen(true)}
+            isCompleted={isCompleted}
+            onOpenSummary={() => setShowSummaryModal(true)}
+            onStartNewDebate={handleStartNewDebate}
+            onNavigateToHistory={onNavigateToHistory}
             language={language}
           />
+
+          {/* Prominent End Debate Session Action Button at bottom of Arena */}
+          {turns.length > 0 && !isCompleted && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-2xl bg-slate-100/90 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 transition-all shadow-sm">
+              <div className="flex items-center gap-2.5 text-xs text-slate-600 dark:text-slate-400">
+                <span className="text-lg">🏁</span>
+                <div>
+                  <span className="font-bold text-slate-800 dark:text-slate-200 block">
+                    {isVi ? 'Hoàn thành phiên tranh biện' : 'Finish Debate Session'}
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    {isVi ? `Đã thực hiện ${turns.length} lượt. Bấm để kết thúc và lưu điểm C-R-E.` : `${turns.length} turns played. End match to view final scores.`}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => void handleEndSession()}
+                disabled={isLoading}
+                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-bold text-xs shadow-md shadow-rose-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                aria-label={isVi ? 'Kết thúc phiên tranh luận' : 'End Debate Session'}
+              >
+                <span>🏁 {isVi ? 'Kết Thúc Phiên Tranh Luận' : 'End Debate Session'}</span>
+              </button>
+            </div>
+          )}
 
           {/* Anchor for Smart Auto-Scroll */}
           <div ref={feedEndRef} className="h-0 pointer-events-none" />
