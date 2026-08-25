@@ -278,44 +278,55 @@ export async function getSubscriptionPlans(req: AuthRequest, res: Response): Pro
       orderBy: { sortOrder: 'asc' },
     });
 
-    // Auto-seed all canonical plans if any are missing
-    if (dbPlans.length < 6) {
-      const planCodes = listPlanCodes();
-      for (const code of planCodes) {
-        const def = getPlanDefinition(code);
-        if (def) {
-          try {
-            await prisma.subscriptionPlan.upsert({
-              where: { id: def.code },
-              update: { isActive: true },
-              create: {
-                id: def.code,
-                name: def.displayName,
-                billingCycle: def.durationDays > 30 ? 'yearly' : 'monthly',
-                priceVnd: def.listPriceVnd,
-                durationDays: def.durationDays,
-                textTurnsQuota: def.limits.text,
-                voiceMinsQuota: def.limits.voice,
-                assistantQuota: def.limits.assistant,
-                isActive: true,
-                isPopular: def.code.includes('STANDARD'),
-                sortOrder: def.code.includes('BASIC') ? 1 : def.code.includes('STANDARD') ? 3 : 5,
-              },
-            });
-          } catch (seedErr) {
-            console.warn('[PLANS_AUTO_SEED_WARN]', seedErr);
-          }
+    // Auto-seed all canonical plans if any are missing or incomplete
+    const planCodes = listPlanCodes();
+    for (const code of planCodes) {
+      const def = getPlanDefinition(code);
+      if (def) {
+        try {
+          const isYearly = def.durationDays > 30;
+          const sortOrder = def.code.includes('BASIC') ? (isYearly ? 2 : 1) : def.code.includes('STANDARD') ? (isYearly ? 4 : 3) : (isYearly ? 6 : 5);
+          await prisma.subscriptionPlan.upsert({
+            where: { id: def.code },
+            update: {
+              name: def.displayName,
+              billingCycle: isYearly ? 'yearly' : 'monthly',
+              priceVnd: def.listPriceVnd,
+              durationDays: def.durationDays,
+              textTurnsQuota: def.limits.text,
+              voiceMinsQuota: def.limits.voice,
+              assistantQuota: def.limits.assistant,
+              isActive: true,
+              isPopular: def.code.includes('STANDARD'),
+              sortOrder,
+            },
+            create: {
+              id: def.code,
+              name: def.displayName,
+              billingCycle: isYearly ? 'yearly' : 'monthly',
+              priceVnd: def.listPriceVnd,
+              durationDays: def.durationDays,
+              textTurnsQuota: def.limits.text,
+              voiceMinsQuota: def.limits.voice,
+              assistantQuota: def.limits.assistant,
+              isActive: true,
+              isPopular: def.code.includes('STANDARD'),
+              sortOrder,
+            },
+          });
+        } catch (seedErr) {
+          console.warn('[PLANS_AUTO_SEED_WARN]', seedErr);
         }
       }
-
-      dbPlans = await prisma.subscriptionPlan.findMany({
-        where: {
-          isActive: true,
-          billingCycle: { in: ['monthly', 'yearly'] },
-        },
-        orderBy: { sortOrder: 'asc' },
-      });
     }
+
+    dbPlans = await prisma.subscriptionPlan.findMany({
+      where: {
+        isActive: true,
+        billingCycle: { in: ['monthly', 'yearly'] },
+      },
+      orderBy: { sortOrder: 'asc' },
+    });
 
     const plans = dbPlans.map((p) => {
       const rawFeatures = p.features as string[] | null;
