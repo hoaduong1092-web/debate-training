@@ -58,53 +58,61 @@ export interface OpponentResult {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const OPPONENT_MODEL = getOpponentModel();
-
 /**
  * Max tokens for opponent response.
- * Vietnamese 100-200 word rebuttal ≈ 200-350 tokens.
- * 600 gives safe headroom while reducing inference latency vs 1000.
+ * For Gemini Thinking models (e.g. 2.0/2.5/3.6), internal <thought> reasoning consumes 500-1500 tokens.
+ * Setting max_tokens = 3500 guarantees sufficient headroom for both thought generation and a rich 250-380 word rebuttal.
  */
-const OPPONENT_MAX_TOKENS = 800;
+const OPPONENT_MAX_TOKENS = 3500;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
- * Strip markdown code fences from opponent plain-text output.
+ * Strip markdown code fences and extraneous model prefixes from opponent output.
  * Handles:
  *   - Complete fences: ```\n...\n```
  *   - Language-tagged fences: ```vietnamese\n...\n```
  *   - Partial fences at start/end
+ *   - Prefixes like "Draft:*", "Draft:", "Phản biện:", "Đối thủ AI:"
  *   - Null / empty input (returns empty string)
  */
-function stripOpponentFences(raw: string | null | undefined): string {
+export function stripOpponentFences(raw: string | null | undefined): string {
   if (raw == null) return '';
-  const text = raw.trim();
+  let text = raw.trim();
   if (!text) return '';
 
-  // Try complete fence match first (most reliable).
+  // 1. Try complete fence match first (most reliable).
   const fenceMatch = text.match(/^```(?:\w+)?\s*\r?\n([\s\S]*?)\r?\n```\s*$/);
-  if (fenceMatch) return fenceMatch[1].trim();
+  if (fenceMatch) {
+    text = fenceMatch[1].trim();
+  } else {
+    // Partial fence stripping at start and end.
+    text = text
+      .replace(/^```(?:\w+)?\s*\r?\n?/, '')
+      .replace(/\r?\n?```\s*$/, '')
+      .trim();
+  }
 
-  // Partial fence stripping at start and end.
-  return text
-    .replace(/^```(?:\w+)?\s*\r?\n?/, '')
-    .replace(/\r?\n?```\s*$/, '')
+  // 2. Strip only leading role headers on the FIRST line if present (e.g. "Draft:", "Phản biện (Phe Phản đối):", "AI Opponent:")
+  text = text
+    .replace(/^(?:Draft\s*:?\*?|Phản\s*biện\s*(?:\([^\)\n]+\))?\s*:|AI\s*(?:Opponent)?\s*:|Đối\s*thủ\s*(?:AI)?\s*:|###\s*[^\n]+\n+)\s*/i, '')
     .trim();
+
+  return text;
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
- * Generate an AI Opponent counterargument via Beeknoee gateway.
+ * Generate an AI Opponent counterargument via Beeknoee/Gemini gateway.
  *
  * Flow:
- * 1. Build structured prompts (system + turn) with labelled dialogue history.
+ * 1. Build structured prompts (system + turn) with labelled dialogue history and proportional guidance.
  * 2. Call LLM — PLAIN TEXT mode, NO response_format: json_object.
- * 3. Strip markdown fences from output.
+ * 3. Strip markdown fences and prefixes from output.
  * 4. Log raw result for diagnostics BEFORE safety filter.
  * 5. Run post-generation safety filter (Spec 17 §10).
- * 6. Return safe text with telemetry stamped as beeknoee-gateway.
+ * 6. Return safe text with telemetry.
  *
  * Fallback to OPPONENT_FALLBACK_MESSAGE ONLY when:
  *   - The LLM call throws a fatal network/timeout error (caller handles via Failure Matrix).
@@ -117,6 +125,8 @@ function stripOpponentFences(raw: string | null | undefined): string {
 export async function generateOpponentResponse(
   input: OpponentInput,
 ): Promise<OpponentResult> {
+  const opponentModel = getOpponentModel();
+
   // 1. Build structured prompts.
   const { systemPrompt, userPrompt } = buildOpponentPrompt({
     topic: input.topic,
@@ -134,11 +144,11 @@ export async function generateOpponentResponse(
     sessionId: input.sessionId,
     turnNumber: input.turnNumber,
     serviceType: 'LLM_OPPONENT',
-    modelName: OPPONENT_MODEL,
+    modelName: opponentModel,
     taskName: 'Opponent_Rebuttal',
     apiCallFunction: async () => {
       const completion = await createOpenAIChatCompletion({
-        model: OPPONENT_MODEL,
+        model: opponentModel,
         systemPrompt,
         userPrompt,
         temperature: 0.7,
@@ -171,7 +181,7 @@ export async function generateOpponentResponse(
   console.info('[OPPONENT_RAW]', {
     sessionId: input.sessionId,
     turn: input.turnNumber,
-    model: OPPONENT_MODEL,
+    model: opponentModel,
     in_tokens: (aiResult as any).usage?.prompt_tokens ?? 0,
     out_tokens: (aiResult as any).usage?.completion_tokens ?? 0,
     raw_length: rawText.length,

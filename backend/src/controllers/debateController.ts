@@ -491,27 +491,71 @@ export async function handleDebateMessage(req: Request, res: Response) {
       throw dbErr;
     }
 
-    // 5. Load conversation history from persisted transcripts.
-    const MAX_HISTORY_ENTRIES = 4;
-    const transcripts = await prisma.debateTranscript.findMany({
+    // 5a. Load conversation history for Opponent LLM (both user and AI turns)
+    const MAX_OPPONENT_HISTORY_ENTRIES = 4;
+    const opponentTranscripts = await prisma.debateTranscript.findMany({
       where: {
         sessionId,
         turnNumber: { lt: userTurnNumber },
       },
       orderBy: { turnNumber: 'desc' },
-      take: MAX_HISTORY_ENTRIES,
+      take: MAX_OPPONENT_HISTORY_ENTRIES,
       select: { speakerType: true, textContent: true },
     });
 
-    transcripts.reverse();
+    opponentTranscripts.reverse();
 
-    const history: HistoryEntry[] = transcripts.map((t) => ({
+    const opponentHistory: HistoryEntry[] = opponentTranscripts.map((t) => ({
       speaker: t.speakerType === 'user' ? 'Người dùng' : 'Đối thủ AI',
       text: t.textContent,
     }));
 
+    // 5b. Reconstruct clean LogicCoach history exclusively from previous USER turns in DB
+    // (Invariant: NEVER mix AI opponent transcripts into Logic Coach history; Turn 1 has history = [])
+    const MAX_COACH_HISTORY_TURNS = 3;
+    const previousUserTranscripts = await prisma.debateTranscript.findMany({
+      where: {
+        sessionId,
+        speakerType: 'user',
+        turnNumber: { lt: userTurnNumber },
+      },
+      orderBy: { turnNumber: 'desc' },
+      take: MAX_COACH_HISTORY_TURNS,
+      select: { turnNumber: true, textContent: true, fallaciesDetected: true, evidenceStar: true },
+    });
+
+    previousUserTranscripts.reverse();
+
+    const serverCoachHistory: LogicCoachHistoryTurn[] = previousUserTranscripts.map((ut) => {
+      let coachFb: LogicCoachHistoryTurn['coachFeedback'] = undefined;
+      if (Array.isArray(ut.fallaciesDetected)) {
+        for (const item of ut.fallaciesDetected) {
+          if (typeof item === 'string' && item.startsWith('__coach__')) {
+            try {
+              const snapshot = JSON.parse(item.slice(9));
+              coachFb = {
+                score: typeof snapshot.score === 'number' ? snapshot.score : 0,
+                fallacies_detected: Array.isArray(snapshot.fallacies_detected) ? snapshot.fallacies_detected : [],
+                weaknesses: Array.isArray(snapshot.weaknesses) ? snapshot.weaknesses : [],
+                actionable_suggestions: Array.isArray(snapshot.actionable_suggestions) ? snapshot.actionable_suggestions : [],
+              };
+              break;
+            } catch {}
+          }
+        }
+      }
+      return {
+        speaker: 'Người dùng',
+        text: ut.textContent,
+        coachFeedback: coachFb,
+      };
+    });
+
     // 6. PARALLEL EXECUTION.
     const userSide = (session.userSide ?? stance) as 'AFFIRMATIVE' | 'NEGATIVE';
+    const effectiveCoachModel = getLogicCoachModel();
+
+    console.info(`[LogicCoach] Initiating analysis: turn=${userTurnNumber} model=${effectiveCoachModel} historyTurns=${serverCoachHistory.length}`);
 
     const [opponentSettled, coachSettled] = await Promise.allSettled([
       // AI Opponent
@@ -521,7 +565,7 @@ export async function handleDebateMessage(req: Request, res: Response) {
         topic: session.topic,
         userSide,
         content,
-        history,
+        history: opponentHistory,
         turnNumber: userTurnNumber,
         characterId: session.characterId,
         targetArgument: argumentContext,
@@ -532,9 +576,7 @@ export async function handleDebateMessage(req: Request, res: Response) {
           topic: session.topic,
           stance: userSide,
           content,
-          history: Array.isArray(coachHistory)
-            ? (coachHistory as LogicCoachHistoryTurn[])
-            : (history as LogicCoachHistoryTurn[]),
+          history: serverCoachHistory,
           targetArgument: argumentContext,
         });
 
@@ -543,11 +585,11 @@ export async function handleDebateMessage(req: Request, res: Response) {
           sessionId,
           turnNumber: userTurnNumber,
           serviceType: 'LLM_COACH',
-          modelName: LOGIC_COACH_MODEL,
+          modelName: effectiveCoachModel,
           taskName: 'Logic_Coach_Analysis',
           apiCallFunction: async () => {
             const completion = await createOpenAIChatCompletion({
-              model: LOGIC_COACH_MODEL,
+              model: effectiveCoachModel,
               systemPrompt,
               userPrompt,
               temperature: 0.7,
@@ -611,8 +653,13 @@ export async function handleDebateMessage(req: Request, res: Response) {
         tokens: coachResult.usage,
         execution_ms: coachResult.execution_ms,
       };
+      console.info(`[LogicCoach] Completed successfully: turn=${userTurnNumber} score=${coachFeedback?.score}`);
     } else {
-      console.error('[COACH_FAIL]', (coachSettled as PromiseRejectedResult).reason);
+      console.error('[COACH_FAIL]', {
+        turnNumber: userTurnNumber,
+        sessionId,
+        reason: (coachSettled as PromiseRejectedResult).reason,
+      });
     }
 
     // 7b. Generate local TTS audio via VoiceStudio microservice (if online)

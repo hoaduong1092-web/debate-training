@@ -62,13 +62,13 @@ function formatHistoryTurn(turn: LogicCoachHistoryTurn, turnIndex: number): stri
     const fb = turn.coachFeedback;
     lines.push(`  Điểm: ${fb.score}/10`);
     // Only include non-empty arrays, limit to top 2 items each.
-    if (fb.fallacies_detected.length > 0) {
+    if (Array.isArray(fb.fallacies_detected) && fb.fallacies_detected.length > 0) {
       lines.push(`  Ngụy biện: ${fb.fallacies_detected.slice(0, 2).join('; ')}`);
     }
-    if (fb.weaknesses.length > 0) {
+    if (Array.isArray(fb.weaknesses) && fb.weaknesses.length > 0) {
       lines.push(`  Điểm yếu: ${fb.weaknesses.slice(0, 2).join('; ')}`);
     }
-    if (fb.actionable_suggestions.length > 0) {
+    if (Array.isArray(fb.actionable_suggestions) && fb.actionable_suggestions.length > 0) {
       lines.push(`  Gợi ý trước: ${fb.actionable_suggestions.slice(0, 1).join('; ')}`);
     }
   } else {
