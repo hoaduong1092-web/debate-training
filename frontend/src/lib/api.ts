@@ -1671,6 +1671,44 @@ export async function fetchUserOrders(limit = 50, skip = 0): Promise<UserOrdersR
   return payload as UserOrdersResponse;
 }
 
+export interface OrderStatusResponse {
+  success: boolean;
+  orderCode: string;
+  status: string;
+  isPaid: boolean;
+  amountVnd: number;
+  planId: string;
+  provider: string;
+  quotaStatus?: any;
+}
+
+/**
+ * GET /api/v1/payments/status/:orderCode
+ * Live polling for payment completion (VietQR SePAY, VNPay, MoMo).
+ */
+export async function fetchPaymentOrderStatus(orderCode: string): Promise<OrderStatusResponse> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const response = await fetch(`${API_BASE_URL}/payments/status/${encodeURIComponent(orderCode)}`, {
+    headers,
+  });
+
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    throw new ArenaApiError(response.status, extractErrorMessage(data));
+  }
+
+  return data as OrderStatusResponse;
+}
+
 // ─── Team Pass & Bundles API Types ──────────────────────────────────────────
 
 export interface TeamSeatUser {
@@ -2253,6 +2291,7 @@ export const api = {
   finalizeVoiceSession,
   abortVoiceSession,
   fetchUserOrders,
+  fetchPaymentOrderStatus,
 };
 
 

@@ -584,6 +584,53 @@ export async function handlePaymentWebhook(req: Request, res: Response): Promise
   }
 }
 
+// ─── GET /api/v1/payments/status/:orderCode ───────────────────────────────────
+
+export async function getOrderStatus(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const userId = req.userId;
+    const rawOrderCode = req.params.orderCode;
+    const orderCode = Array.isArray(rawOrderCode) ? rawOrderCode[0] : String(rawOrderCode || '');
+
+    if (!orderCode) {
+      res.status(400).json({ error: 'orderCode is required' });
+      return;
+    }
+
+    const order = await prisma.paymentOrder.findUnique({
+      where: { orderCode },
+    });
+
+    if (!order) {
+      res.status(404).json({ error: 'Order not found' });
+      return;
+    }
+
+    if (order.userId !== userId) {
+      res.status(403).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const isPaid = order.status === 'PAID';
+    const quotaStatus = isPaid ? await getUserQuotaStatus(userId) : null;
+
+    res.json({
+      success: true,
+      orderCode: order.orderCode,
+      status: order.status,
+      isPaid,
+      amountVnd: Number(order.amountVnd),
+      planId: order.planId,
+      provider: order.provider,
+      quotaStatus,
+    });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Internal Server Error';
+    console.error('[GET_ORDER_STATUS_ERROR]', error);
+    res.status(500).json({ error: msg });
+  }
+}
+
 // ─── POST /api/v1/payments/sandbox-upgrade ───────────────────────────────────
 
 export async function handleSandboxDirectUpgrade(
@@ -591,7 +638,12 @@ export async function handleSandboxDirectUpgrade(
   res: Response,
 ): Promise<void> {
   try {
-    if (process.env.NODE_ENV === 'production') {
+    const allowSandbox =
+      process.env.NODE_ENV !== 'production' ||
+      process.env.ENABLE_SANDBOX === 'true' ||
+      process.env.ENABLE_TEST_OTP === 'true';
+
+    if (!allowSandbox) {
       res.status(403).json({
         error: 'Sandbox disabled',
         message: 'Sandbox instant upgrades are disabled in production environment',

@@ -410,6 +410,49 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
     }
   };
 
+  // Auto-poll payment order status when on checkout screen
+  useEffect(() => {
+    if (!selectedItem || !checkoutData?.orderCode || fulfillmentSuccess) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const statusRes = await api.fetchPaymentOrderStatus(checkoutData.orderCode);
+        if (statusRes.isPaid) {
+          clearInterval(interval);
+          setFulfillmentSuccess(true);
+          await refreshUser();
+        }
+      } catch {
+        // Silently ignore polling network errors
+      }
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [selectedItem, checkoutData?.orderCode, fulfillmentSuccess, refreshUser]);
+
+  // Handle Manual Status Check
+  const handleCheckStatus = async () => {
+    if (!checkoutData?.orderCode || checkoutLoading) return;
+    setCheckoutLoading(true);
+    try {
+      const statusRes = await api.fetchPaymentOrderStatus(checkoutData.orderCode);
+      if (statusRes.isPaid) {
+        setFulfillmentSuccess(true);
+        await refreshUser();
+      } else {
+        alert(
+          language === 'vi'
+            ? 'Hệ thống chưa nhận được thông báo từ ngân hàng. Nếu bạn vừa chuyển khoản, vui lòng đợi 3-5 giây để ngân hàng gửi thông báo rồi bấm kiểm tra lại nhé!'
+            : 'Payment notification not yet received from bank. Please wait a few seconds and try again.',
+        );
+      }
+    } catch (err: any) {
+      alert(`Lỗi kiểm tra trạng thái: ${err.message || 'Vui lòng thử lại'}`);
+    } finally {
+      setCheckoutLoading(false);
+    }
+  };
+
   // Handle Sandbox Direct Upgrade
   const handleSandboxSimulate = async () => {
     if (!selectedItem || checkoutLoading) return;
@@ -595,22 +638,32 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
                         </button>
                       </div>
 
-                      <div className="pt-2 flex gap-2">
+                      <div className="pt-2 flex flex-col gap-2">
                         <button
                           type="button"
                           disabled={checkoutLoading}
-                          onClick={handleSandboxSimulate}
-                          className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition shadow-md disabled:opacity-50"
+                          onClick={handleCheckStatus}
+                          className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
                         >
-                          ✓ Xác Nhận Đã Chuyển Khoản (Simulate)
+                          <span>🔄 {language === 'vi' ? 'Tôi Đã Chuyển Khoản (Kiểm Tra Ngay)' : 'Check Payment Status'}</span>
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedItem(null)}
-                          className="px-4 py-2.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs"
-                        >
-                          Quay lại
-                        </button>
+                        <div className="flex items-center justify-between text-[11px] pt-1">
+                          <button
+                            type="button"
+                            disabled={checkoutLoading}
+                            onClick={handleSandboxSimulate}
+                            className="text-amber-600 dark:text-amber-400 hover:underline font-semibold cursor-pointer"
+                          >
+                            ⚡ {language === 'vi' ? 'Kích hoạt Thử nghiệm (Sandbox)' : 'Simulate Sandbox'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedItem(null)}
+                            className="text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-bold cursor-pointer"
+                          >
+                            {language === 'vi' ? '← Chọn gói khác' : '← Choose another'}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>

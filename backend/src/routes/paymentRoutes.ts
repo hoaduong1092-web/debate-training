@@ -21,6 +21,7 @@ import { authenticate } from '../middleware/auth';
 import {
   createCheckoutSession,
   getUserOrders,
+  getOrderStatus,
   handleVNPayIpn,
   handleMoMoIpn,
   handleSePayWebhook,
@@ -32,6 +33,9 @@ const router = Router();
 
 // GET /api/v1/payments/orders (Phase C1-A User Transaction History)
 router.get('/orders', authenticate, getUserOrders as unknown as RequestHandler);
+
+// GET /api/v1/payments/status/:orderCode (Phase C1-A Live Order Status Polling)
+router.get('/status/:orderCode', authenticate, getOrderStatus as unknown as RequestHandler);
 
 // POST /api/v1/payments/checkout
 // Authenticated endpoint to initiate a payment order (Plan, Credit Pack, or VIP Pass)
@@ -55,7 +59,7 @@ router.post('/sepay/webhook', handleSePayWebhook as unknown as RequestHandler);
 router.post('/webhook', handlePaymentWebhook as unknown as RequestHandler);
 
 // POST /api/v1/payments/sandbox-upgrade
-// Authenticated sandbox activation endpoint (disabled in production)
+// Authenticated sandbox activation endpoint
 router.post('/sandbox-upgrade', authenticate, handleSandboxDirectUpgrade as unknown as RequestHandler);
 
 export default router;
