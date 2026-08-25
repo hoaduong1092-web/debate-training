@@ -278,8 +278,8 @@ export async function getSubscriptionPlans(req: AuthRequest, res: Response): Pro
       orderBy: { sortOrder: 'asc' },
     });
 
-    // Auto-seed plans if DB table is empty
-    if (dbPlans.length === 0) {
+    // Auto-seed all canonical plans if any are missing
+    if (dbPlans.length < 6) {
       const planCodes = listPlanCodes();
       for (const code of planCodes) {
         const def = getPlanDefinition(code);
