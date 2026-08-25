@@ -32,7 +32,6 @@ import {
   Trash2,
   CheckSquare,
   Square,
-  X,
   AlertTriangle,
 } from 'lucide-react';
 import {
