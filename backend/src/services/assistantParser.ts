@@ -512,3 +512,103 @@ export function parseMotionAnalysis(raw: string | unknown): MotionAnalysisResult
   };
 }
 
+// ─── Argument Refinement Types & Parser ──────────────────────────────────────
+
+export interface RefinedArgumentResult {
+  claim: string;
+  reasoning: string;
+  evidenceSuggestion: string;
+  refinementNote: string;
+}
+
+/**
+ * Production-grade robust normalizer for AI Argument Refinement output.
+ * Spec: docs/AI_ARGUMENT_REFINEMENT_SPEC.md §14, §17
+ *
+ * Handles:
+ *   - Markdown code fences (```json ... ```)
+ *   - Surrounding text/explanations
+ *   - Nested wrapper objects ({ result: ... }, { data: ... }, { cre: ... }, { argument: ... })
+ *   - camelCase and snake_case keys
+ *   - Vietnamese keys (luan_diem, lap_luan, dan_chung, ghi_chu)
+ *   - Array-formatted evidence suggestions or sub-objects
+ *   - String-cleaning & unclosed JSON repair
+ */
+export function parseArgumentRefinement(raw: unknown): RefinedArgumentResult | null {
+  const root = extractObject(raw);
+  if (!root) return null;
+
+  // Unwrap potential wrapper objects
+  let target: Record<string, unknown> = root;
+  const wrapperKeys = ['result', 'data', 'argument', 'cre', 'candidate', 'output', 'refinement', 'response', 'item'];
+  for (const wk of wrapperKeys) {
+    if (target[wk] && typeof target[wk] === 'object' && !Array.isArray(target[wk])) {
+      target = target[wk] as Record<string, unknown>;
+      break;
+    }
+  }
+
+  // 1. Extract Claim (required)
+  let claim = pick(target, [
+    'claim', 'luan_diem', 'khang_dinh', 'assertion', 'y_chinh', 'diem_chinh', 'point', 'title', 'statement', 'argument'
+  ], '');
+  if (!claim) {
+    const claimObj = target['claim'] || target['luan_diem'] || target['khang_dinh'];
+    if (claimObj && typeof claimObj === 'object') {
+      claim = (claimObj as any).text || (claimObj as any).content || (claimObj as any).value || '';
+    }
+  }
+  if (!claim || claim.trim().length === 0) return null;
+
+  // 2. Extract Reasoning (required)
+  let reasoning = pick(target, [
+    'reasoning', 'lap_luan', 'ly_giai', 'giai_thich', 'explanation', 'logic', 'rationale', 'analysis', 'ly_le', 'justification'
+  ], '');
+  if (!reasoning) {
+    const reasoningObj = target['reasoning'] || target['lap_luan'] || target['ly_giai'];
+    if (reasoningObj && typeof reasoningObj === 'object') {
+      reasoning = (reasoningObj as any).text || (reasoningObj as any).content || (reasoningObj as any).value || '';
+    }
+  }
+  if (!reasoning || reasoning.trim().length === 0) return null;
+
+  // 3. Extract Evidence Suggestion (optional, string or array)
+  let evidenceSuggestion = pick(target, [
+    'evidenceSuggestion', 'evidence_suggestion', 'evidence', 'dan_chung', 'goi_y_dan_chung', 'bang_chung', 'source', 'example', 'support', 'sources', 'examples'
+  ], '');
+  if (!evidenceSuggestion) {
+    const arr = pickArray(target, [
+      'evidenceSuggestion', 'evidence_suggestion', 'evidence', 'dan_chung', 'goi_y_dan_chung', 'bang_chung', 'sources', 'examples', 'support'
+    ]);
+    if (arr.length > 0) {
+      evidenceSuggestion = toStringArray(arr).join('. ');
+    } else {
+      const evObj = target['evidenceSuggestion'] || target['evidence_suggestion'] || target['evidence'] || target['dan_chung'];
+      if (evObj && typeof evObj === 'object') {
+        evidenceSuggestion = (evObj as any).text || (evObj as any).content || (evObj as any).value || (evObj as any).suggestion || '';
+      }
+    }
+  }
+
+  // 4. Extract Refinement Note (optional)
+  const refinementNote = pick(target, [
+    'refinementNote', 'refinement_note', 'ghi_chu', 'note', 'improvement', 'changes', 'comment', 'nhan_xet'
+  ], '');
+
+  return {
+    claim: cleanRefinedString(claim),
+    reasoning: cleanRefinedString(reasoning),
+    evidenceSuggestion: cleanRefinedString(evidenceSuggestion),
+    refinementNote: cleanRefinedString(refinementNote),
+  };
+}
+
+function cleanRefinedString(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/^["']|["']$/g, '')
+    .replace(/\r\n/g, '\n')
+    .trim();
+}
+
+

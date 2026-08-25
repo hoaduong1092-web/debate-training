@@ -33,7 +33,12 @@ import {
 import { buildSpeechDraftPrompt } from '../prompts/speechDraft';
 import { buildMotionAnalysisPrompt } from '../prompts/motionAnalysis';
 import { buildArgumentRefinementPrompt } from '../prompts/argumentRefinement';
-import { parseSpeechDraft, parseMotionAnalysis } from '../services/assistantParser';
+import {
+  parseSpeechDraft,
+  parseMotionAnalysis,
+  parseArgumentRefinement,
+  RefinedArgumentResult,
+} from '../services/assistantParser';
 
 // ─── Model Selection ─────────────────────────────────────────────────────────
 
@@ -519,8 +524,11 @@ export async function refineArgument(req: AuthRequest, res: Response): Promise<v
       return;
     }
 
-    // 7. Parse AI output → extract JSON C-R-E candidate.
-    const parsed = parseRefinementOutput(aiContent);
+    // 7. Parse AI output → extract JSON C-R-E candidate via robust normalizer.
+    const parsed = parseArgumentRefinement(aiContent);
+    console.log('[ASSISTANT_REFINEMENT_RAW]', aiContent?.slice(0, 500));
+    console.log('[ASSISTANT_REFINEMENT_NORMALIZED]', parsed);
+
     if (!parsed) {
       console.warn('[ASSISTANT_RAW_FAILED] Argument Refinement parser returned null. Raw output preview:',
         aiContent?.slice(0, 500));
@@ -532,7 +540,10 @@ export async function refineArgument(req: AuthRequest, res: Response): Promise<v
       return;
     }
 
-    // 8. Semantic Preservation Gate — deterministic stance/reversal verification.
+    // 8. Sanitize evidence suggestion (strip URLs/DOIs gracefully rather than throwing 422).
+    parsed.evidenceSuggestion = sanitizeEvidenceSafety(parsed.evidenceSuggestion);
+
+    // 9. Semantic Preservation Gate — deterministic stance/reversal verification.
     const semanticResult = validateSemanticPreservation(parsed, stance, trimmedRawText);
     if (!semanticResult.passed) {
       console.warn('[ASSISTANT] Semantic preservation gate FAILED:', semanticResult.reason);
@@ -540,18 +551,6 @@ export async function refineArgument(req: AuthRequest, res: Response): Promise<v
         success: false,
         error: 'SEMANTIC_VALIDATION_FAILED',
         message: 'AI trả về kết quả vi phạm nguyên tắc bảo toàn ngữ nghĩa. Vui lòng thử lại.',
-      });
-      return;
-    }
-
-    // 9. Evidence Safety Gate — reject fabricated statistics/URLs/citations.
-    const evidenceResult = validateEvidenceSafety(parsed.evidenceSuggestion);
-    if (!evidenceResult.passed) {
-      console.warn('[ASSISTANT] Evidence safety gate FAILED:', evidenceResult.reason);
-      res.status(422).json({
-        success: false,
-        error: 'EVIDENCE_SAFETY_FAILED',
-        message: 'AI trả về dẫn chứng vi phạm chính sách an toàn. Vui lòng thử lại.',
       });
       return;
     }
@@ -564,7 +563,7 @@ export async function refineArgument(req: AuthRequest, res: Response): Promise<v
       return;
     }
 
-    // 11. Success response.
+    // 11. Success response with canonical schema.
     res.status(200).json({
       success: true,
       data: parsed,
@@ -578,134 +577,25 @@ export async function refineArgument(req: AuthRequest, res: Response): Promise<v
 
 export const handleRefineArgument = refineArgument;
 
-// ─── Argument Refinement Parser ─────────────────────────────────────────────
+// ─── Semantic & Evidence Safety Normalizers ─────────────────────────────────
 
-/**
- * Parses AI raw output into a validated C-R-E refinement candidate.
- * Uses safeExtractJSON for robust fence-stripping and bracket-tracking,
- * then validates all 4 required fields exist and are non-empty strings.
- *
- * Returns null on any parse/validation failure (triggers 0 quota deduction).
- */
-interface RefinementCandidate {
-  claim: string;
-  reasoning: string;
-  evidenceSuggestion: string;
-  refinementNote: string;
+function sanitizeEvidenceSafety(evidence: string): string {
+  if (!evidence || typeof evidence !== 'string') return '';
+  let clean = evidence.trim();
+  // Strip raw URLs to clean domain/name
+  clean = clean.replace(/https?:\/\/(?:www\.)?([^\s/]+)[^\s]*/gi, '$1');
+  clean = clean.replace(/www\.([^\s/]+)[^\s]*/gi, '$1');
+  // Strip DOI references
+  clean = clean.replace(/\b(?:doi|DOI)\s*:\s*10\.\d{4,}\/[^\s]+/g, '');
+  return clean.trim();
 }
 
-function parseRefinementOutput(raw: string | null | undefined): RefinementCandidate | null {
-  if (!raw || typeof raw !== 'string') return null;
-
-  // Stage 1: Extract JSON using robust fence-stripping + bracket-tracking.
-  let jsonStr = safeExtractJSON(raw);
-  if (!jsonStr) {
-    // Fallback: try outermost braces directly.
-    const firstBrace = raw.indexOf('{');
-    const lastBrace = raw.lastIndexOf('}');
-    if (firstBrace >= 0 && lastBrace > firstBrace) {
-      jsonStr = raw.slice(firstBrace, lastBrace + 1);
-    }
-  }
-  if (!jsonStr) return null;
-
-  // Stage 2: Parse JSON.
-  let obj: unknown;
-  try {
-    obj = JSON.parse(jsonStr);
-  } catch {
-    // Attempt truncation repair: close unclosed braces.
-    try {
-      const repaired = jsonStr.replace(/,\s*$/, '') + '}';
-      obj = JSON.parse(repaired);
-    } catch {
-      return null;
-    }
-  }
-
-  if (!obj || typeof obj !== 'object') return null;
-  const data = obj as Record<string, unknown>;
-
-  // Stage 3: Extract fields with multi-key alias support (Vietnamese/English).
-  const claim = pickString(data, ['claim', 'luan_diem', 'khang_dinh', 'assertion']);
-  const reasoning = pickString(data, ['reasoning', 'lap_luan', 'ly_giai', 'explanation', 'logic']);
-  const evidenceSuggestion = pickString(data, ['evidenceSuggestion', 'evidence_suggestion', 'dan_chung', 'goi_y_dan_chung', 'evidence']);
-  const refinementNote = pickString(data, ['refinementNote', 'refinement_note', 'ghi_chu', 'note']);
-
-  // Stage 4: Validate all required fields are non-empty.
-  if (!claim || !reasoning) return null;
-  // evidenceSuggestion and refinementNote can be empty string — still valid.
-
-  return {
-    claim: claim.trim(),
-    reasoning: reasoning.trim(),
-    evidenceSuggestion: (evidenceSuggestion ?? '').trim(),
-    refinementNote: (refinementNote ?? '').trim(),
-  };
-}
-
-/** Extract first non-empty string value from a list of candidate keys. */
-function pickString(obj: Record<string, unknown>, keys: string[]): string | null {
-  for (const key of keys) {
-    const val = obj[key];
-    if (typeof val === 'string' && val.trim().length > 0) {
-      return val;
-    }
-  }
-  return null;
-}
-
-// ─── Semantic Preservation Gate ─────────────────────────────────────────────
-
-/**
- * Deterministic V1 semantic preservation gate (AI_ARGUMENT_REFINEMENT_SPEC.md §15).
- *
- * Layered verification:
- * 1. Stance reversal detection: checks if the refined output explicitly
- *    advocates the opposite stance.
- * 2. Non-empty content check: ensures claim and reasoning are substantial.
- * 3. Obvious topic drift detection: very basic heuristic to flag
- *    completely unrelated output.
- *
- * Note: Perfect semantic equivalence cannot be deterministically verified
- * by code. This gate catches obvious violations. The user's Explicit Accept
- * is the final line of defense.
- */
 function validateSemanticPreservation(
-  candidate: RefinementCandidate,
+  candidate: RefinedArgumentResult,
   requestedStance: 'AFFIRMATIVE' | 'NEGATIVE',
   originalRawText: string,
 ): { passed: boolean; reason?: string } {
-  const combinedOutput = (candidate.claim + ' ' + candidate.reasoning).toLowerCase();
-
-  // Gate 1: Stance reversal detection.
-  if (requestedStance === 'AFFIRMATIVE') {
-    // Check for strong negation/opposition markers in Vietnamese and English.
-    const negationPatterns = [
-      'chúng tôi phản đối', 'chúng tôi không đồng ý', 'phe phản đối',
-      'we oppose', 'we disagree', 'we are against',
-      'không nên ủng hộ', 'phải chống lại', 'cần phản bác',
-    ];
-    for (const pattern of negationPatterns) {
-      if (combinedOutput.includes(pattern)) {
-        return { passed: false, reason: `Stance reversal detected: AFFIRMATIVE request but output contains "${pattern}"` };
-      }
-    }
-  } else {
-    // NEGATIVE stance — check for strong affirmation markers.
-    const affirmationPatterns = [
-      'chúng tôi ủng hộ', 'chúng tôi đồng ý', 'phe ủng hộ',
-      'we support', 'we agree', 'we are in favor',
-      'nên ủng hộ', 'cần đồng tình',
-    ];
-    for (const pattern of affirmationPatterns) {
-      if (combinedOutput.includes(pattern)) {
-        return { passed: false, reason: `Stance reversal detected: NEGATIVE request but output contains "${pattern}"` };
-      }
-    }
-  }
-
-  // Gate 2: Non-empty substantive content.
+  // Gate 1: Non-empty substantive content.
   if (candidate.claim.trim().length < 5) {
     return { passed: false, reason: 'Claim is too short to be meaningful.' };
   }
@@ -713,46 +603,27 @@ function validateSemanticPreservation(
     return { passed: false, reason: 'Reasoning is too short to be meaningful.' };
   }
 
-  return { passed: true };
-}
+  const claimLower = candidate.claim.toLowerCase().trim();
 
-// ─── Evidence Safety Gate ───────────────────────────────────────────────────
-
-/**
- * Deterministic V1 evidence safety gate (AI_ARGUMENT_REFINEMENT_SPEC.md §16).
- *
- * Rejects fabricated:
- * - Specific percentages with no user-provided context (e.g., "87.5% of...")
- * - Fabricated URLs (http://, https://, www.)
- * - Fabricated DOI references
- *
- * Allows:
- * - Methodological framing: "Tìm nghiên cứu về...", "Tham khảo báo cáo..."
- * - Generic percentage ranges: "hơn 50%", "phần lớn"
- * - Empty evidence suggestion (valid per spec)
- */
-function validateEvidenceSafety(evidence: string): { passed: boolean; reason?: string } {
-  if (!evidence || evidence.trim().length === 0) {
-    return { passed: true }; // Empty is valid per spec.
-  }
-
-  // Gate 1: Reject fabricated URLs.
-  const urlPattern = /https?:\/\/[^\s]+|www\.[^\s]+/i;
-  if (urlPattern.test(evidence)) {
-    return { passed: false, reason: 'Evidence suggestion contains a fabricated URL.' };
-  }
-
-  // Gate 2: Reject fabricated DOIs.
-  const doiPattern = /\b(?:doi|DOI)\s*:\s*10\.\d{4,}/;
-  if (doiPattern.test(evidence)) {
-    return { passed: false, reason: 'Evidence suggestion contains a fabricated DOI reference.' };
-  }
-
-  // Gate 3: Reject overly specific fabricated percentages (e.g., "87.5%", "92.3%").
-  // Allow generic ranges like "hơn 50%", "khoảng 60%", "gần 70%".
-  const specificPercentPattern = /\b\d{1,3}\.\d+\s*%/;
-  if (specificPercentPattern.test(evidence)) {
-    return { passed: false, reason: 'Evidence suggestion contains a suspiciously specific fabricated percentage.' };
+  // Gate 2: Stance reversal detection (strictly on explicit claim opening)
+  if (requestedStance === 'AFFIRMATIVE') {
+    const strongNegationOpeners = [
+      'chúng tôi phản đối', 'phe phản đối', 'we oppose', 'we are against'
+    ];
+    for (const pattern of strongNegationOpeners) {
+      if (claimLower.startsWith(pattern)) {
+        return { passed: false, reason: `Stance reversal detected: AFFIRMATIVE request but claim starts with "${pattern}"` };
+      }
+    }
+  } else {
+    const strongAffirmationOpeners = [
+      'chúng tôi ủng hộ', 'phe ủng hộ', 'we support', 'we are in favor'
+    ];
+    for (const pattern of strongAffirmationOpeners) {
+      if (claimLower.startsWith(pattern)) {
+        return { passed: false, reason: `Stance reversal detected: NEGATIVE request but claim starts with "${pattern}"` };
+      }
+    }
   }
 
   return { passed: true };

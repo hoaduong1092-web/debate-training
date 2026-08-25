@@ -337,15 +337,18 @@ function mapApiError(err: unknown, isVi: boolean): string {
         ? 'Bạn đã dùng hết lượt Trợ lý tháng này. Vui lòng nâng cấp gói để tiếp tục.'
         : 'You have used all Assistant credits for this month. Please upgrade your plan.';
     }
-    if (err.status === 422) {
-      return isVi
-        ? 'Hệ thống AI trả về kết quả không đúng định dạng. Vui lòng thử lại.'
-        : 'AI returned an invalid format. Please try again.';
-    }
     if (err.status === 502) {
       return isVi
         ? 'Dịch vụ AI tạm thời gián đoạn. Vui lòng thử lại sau ít phút.'
         : 'AI service is temporarily unavailable. Please try again in a moment.';
+    }
+    if (err.message && err.message.length > 5 && !err.message.startsWith('HTTP')) {
+      return err.message;
+    }
+    if (err.status === 422) {
+      return isVi
+        ? 'Hệ thống AI trả về kết quả không đúng định dạng. Vui lòng thử lại.'
+        : 'AI returned an invalid format. Please try again.';
     }
     return isVi ? 'Đã xảy ra lỗi. Vui lòng thử lại.' : 'An error occurred. Please try again.';
   }
