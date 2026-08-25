@@ -482,7 +482,7 @@ export async function refineArgument(req: AuthRequest, res: Response): Promise<v
             systemPrompt,
             userPrompt,
             temperature: 0.3, // Conservative: prioritize stability and semantic preservation
-            max_tokens: 800,
+            max_tokens: 2048,
           });
         },
       });

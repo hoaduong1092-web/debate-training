@@ -106,6 +106,14 @@ export function getOpponentModel(): string {
 }
 
 /**
+ * Resolved fallback model when primary model hits rate limit (429) or 404.
+ * Reads MODEL_FALLBACK → gemini-3.5-flash.
+ */
+export function getFallbackModel(): string {
+  return process.env.MODEL_FALLBACK || 'gemini-3.5-flash';
+}
+
+/**
  * Resolved API key.
  * Priority: GEMINI_API_KEY → OPENAI_API_KEY → BEEKNOEE_API_KEY → empty string.
  */
@@ -243,6 +251,18 @@ export async function createOpenAIChatCompletion(
 
     if (!response.ok) {
       const detail = await response.text().catch(() => '');
+      const isRetryable = response.status === 429 || response.status === 404 || response.status === 503;
+      const fallbackModel = getFallbackModel();
+
+      if (isRetryable && fallbackModel && fallbackModel !== model) {
+        console.warn(`[AI_FALLBACK_TRIGGERED] Model "${model}" returned HTTP ${response.status}. Automatically failing over to "${fallbackModel}"...`);
+        clearTimeout(timer);
+        return await createOpenAIChatCompletion({
+          ...request,
+          model: fallbackModel,
+        });
+      }
+
       console.error('[AI_PROVIDER_HTTP_ERROR]', {
         gateway,
         status: response.status,
