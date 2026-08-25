@@ -268,6 +268,33 @@ export interface Strings {
   teamCopyCode: string;
   teamCodeCopied: string;
   teamSeatsActivated: string;
+  // ── Order History Management ──
+  ordersTitle: string;
+  ordersSubtitle: string;
+  ordersCount: string;
+  ordersManage: string;
+  ordersSelectAll: string;
+  ordersDeselectAll: string;
+  ordersSelectedCount: string;
+  ordersDeleteSelected: string;
+  ordersDeleteAll: string;
+  ordersCancelSelect: string;
+  ordersDeleteSingle: string;
+  ordersDeleteSingleConfirmTitle: string;
+  ordersDeleteSingleConfirmBody: string;
+  ordersDeleteBatchConfirmTitle: string;
+  ordersDeleteBatchConfirmBody: string;
+  ordersDeleteAllConfirmTitle: string;
+  ordersDeleteAllConfirmBody: string;
+  ordersConfirmDeleteBtn: string;
+  ordersConfirmDeleteAllBtn: string;
+  ordersCancelBtn: string;
+  ordersDeleteSuccess: string;
+  ordersDeleteBatchSuccess: string;
+  ordersDeleteAllSuccess: string;
+  ordersDeleteError: string;
+  ordersEmptyTitle: string;
+  ordersEmptySubtitle: string;
 }
 
 
@@ -539,6 +566,33 @@ const vi: Strings = {
   teamCopyCode: 'Sao chép mã',
   teamCodeCopied: 'Đã sao chép!',
   teamSeatsActivated: 'ghế thành viên',
+  // ── Order History Management ──
+  ordersTitle: 'Lịch Sử Giao Dịch & Đơn Hàng',
+  ordersSubtitle: 'Danh sách các đơn hàng nạp hạn ngạch, nâng cấp gói hội viên và kích hoạt VIP Pass.',
+  ordersCount: 'đơn hàng',
+  ordersManage: 'Quản lý',
+  ordersSelectAll: 'Chọn tất cả',
+  ordersDeselectAll: 'Bỏ chọn tất cả',
+  ordersSelectedCount: 'Đã chọn: {n} đơn',
+  ordersDeleteSelected: 'Xóa {n} mục đã chọn',
+  ordersDeleteAll: 'Xóa toàn bộ lịch sử',
+  ordersCancelSelect: 'Hủy',
+  ordersDeleteSingle: 'Xóa khỏi lịch sử',
+  ordersDeleteSingleConfirmTitle: 'Xóa đơn hàng khỏi lịch sử?',
+  ordersDeleteSingleConfirmBody: 'Đơn hàng sẽ không còn hiển thị trong lịch sử giao dịch của bạn.\n\nDữ liệu giao dịch vẫn được hệ thống lưu trữ để phục vụ đối soát và bảo mật.',
+  ordersDeleteBatchConfirmTitle: 'Xóa {n} đơn hàng khỏi lịch sử?',
+  ordersDeleteBatchConfirmBody: 'Các đơn hàng đã chọn sẽ không còn hiển thị trong lịch sử giao dịch của bạn.\n\nDữ liệu giao dịch vẫn được hệ thống lưu trữ để phục vụ đối soát.',
+  ordersDeleteAllConfirmTitle: 'Xóa toàn bộ lịch sử giao dịch?',
+  ordersDeleteAllConfirmBody: 'Toàn bộ đơn hàng đang hiển thị sẽ được ẩn khỏi lịch sử giao dịch của bạn.\n\nThao tác này chỉ ẩn lịch sử khỏi tài khoản của bạn. Dữ liệu giao dịch không bị xóa khỏi hệ thống.',
+  ordersConfirmDeleteBtn: 'Xóa',
+  ordersConfirmDeleteAllBtn: 'Xóa toàn bộ',
+  ordersCancelBtn: 'Hủy',
+  ordersDeleteSuccess: '✓ Đã xóa đơn hàng khỏi lịch sử',
+  ordersDeleteBatchSuccess: '✓ Đã xóa {n} đơn hàng khỏi lịch sử',
+  ordersDeleteAllSuccess: '✓ Đã xóa lịch sử giao dịch',
+  ordersDeleteError: 'Không thể xóa đơn hàng. Vui lòng thử lại.',
+  ordersEmptyTitle: 'Chưa có giao dịch nào',
+  ordersEmptySubtitle: 'Các đơn hàng và giao dịch của bạn sẽ xuất hiện tại đây.',
 };
 
 
@@ -810,6 +864,33 @@ const en: Strings = {
   teamCopyCode: 'Copy Code',
   teamCodeCopied: 'Copied!',
   teamSeatsActivated: 'member seats',
+  // ── Order History Management ──
+  ordersTitle: 'Order & Payment History',
+  ordersSubtitle: 'History of quota top-ups, subscription plan activations, and VIP Time Passes.',
+  ordersCount: 'orders',
+  ordersManage: 'Manage',
+  ordersSelectAll: 'Select all',
+  ordersDeselectAll: 'Deselect all',
+  ordersSelectedCount: 'Selected: {n} order(s)',
+  ordersDeleteSelected: 'Delete {n} selected item(s)',
+  ordersDeleteAll: 'Clear all history',
+  ordersCancelSelect: 'Cancel',
+  ordersDeleteSingle: 'Remove from history',
+  ordersDeleteSingleConfirmTitle: 'Delete order from history?',
+  ordersDeleteSingleConfirmBody: 'The order will no longer appear in your transaction history.\n\nTransaction data is still retained for audit and security purposes.',
+  ordersDeleteBatchConfirmTitle: 'Delete {n} orders from history?',
+  ordersDeleteBatchConfirmBody: 'The selected orders will no longer appear in your transaction history.\n\nTransaction data is still retained for audit purposes.',
+  ordersDeleteAllConfirmTitle: 'Clear all transaction history?',
+  ordersDeleteAllConfirmBody: 'All currently visible orders will be hidden from your transaction history.\n\nThis action does not delete payment data from the system.',
+  ordersConfirmDeleteBtn: 'Delete',
+  ordersConfirmDeleteAllBtn: 'Clear All',
+  ordersCancelBtn: 'Cancel',
+  ordersDeleteSuccess: '✓ Order removed from history',
+  ordersDeleteBatchSuccess: '✓ {n} orders removed from history',
+  ordersDeleteAllSuccess: '✓ Transaction history cleared',
+  ordersDeleteError: 'Could not remove order. Please try again.',
+  ordersEmptyTitle: 'No transactions recorded yet',
+  ordersEmptySubtitle: 'Your orders and transactions will appear here.',
 };
 
 

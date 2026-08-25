@@ -806,9 +806,9 @@ export async function getUserOrders(
     const skip = Math.max(0, Number(req.query.skip) || 0);
 
     const [total, orders] = await Promise.all([
-      prisma.paymentOrder.count({ where: { userId } }),
+      prisma.paymentOrder.count({ where: { userId, deletedAt: null } }),
       prisma.paymentOrder.findMany({
-        where: { userId },
+        where: { userId, deletedAt: null },
         orderBy: { createdAt: 'desc' },
         take: limit,
         skip,
@@ -850,6 +850,183 @@ export async function getUserOrders(
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Internal Server Error';
     console.error('[GET_USER_ORDERS_ERROR]', error);
+    res.status(500).json({ error: msg });
+  }
+}
+
+// ─── DELETE /api/v1/payments/orders/:orderId ─────────────────────────────────
+
+/**
+ * Soft-deletes a single payment order from the authenticated user's history.
+ * Uses database UUID id. Does NOT hard delete financial transaction.
+ */
+export async function deleteUserOrder(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized', message: 'Authentication required' });
+      return;
+    }
+
+    const rawOrderId = req.params.orderId;
+    const orderId = (Array.isArray(rawOrderId) ? rawOrderId[0] : String(rawOrderId || '')).trim();
+
+    if (!orderId) {
+      res.status(400).json({ error: 'Bad Request', message: 'orderId parameter is required' });
+      return;
+    }
+
+    // Security Gate: Query by id + userId + deletedAt: null to prevent existence leakage
+    const order = await prisma.paymentOrder.findFirst({
+      where: {
+        id: orderId,
+        userId,
+        deletedAt: null,
+      },
+    });
+
+    if (!order) {
+      res.status(404).json({ error: 'Not Found', message: 'Order not found or already removed from history' });
+      return;
+    }
+
+    await prisma.paymentOrder.update({
+      where: { id: order.id },
+      data: { deletedAt: new Date() },
+    });
+
+    res.json({
+      success: true,
+      orderId: order.id,
+      message: 'Order removed from history successfully',
+    });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Internal Server Error';
+    console.error('[DELETE_USER_ORDER_ERROR]', error);
+    res.status(500).json({ error: msg });
+  }
+}
+
+// ─── POST /api/v1/payments/orders/delete-batch ────────────────────────────────
+
+/**
+ * Soft-deletes multiple payment orders from the authenticated user's history.
+ * Strictly validates array payload, deduplicates, and limits batch size.
+ */
+export async function deleteUserOrdersBatch(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized', message: 'Authentication required' });
+      return;
+    }
+
+    const { orderIds } = req.body as { orderIds?: unknown };
+
+    // Batch Validation
+    if (!Array.isArray(orderIds)) {
+      res.status(400).json({
+        error: 'Bad Request',
+        message: 'orderIds must be a non-empty array of strings',
+      });
+      return;
+    }
+
+    if (orderIds.length === 0) {
+      res.status(400).json({
+        error: 'Bad Request',
+        message: 'orderIds array cannot be empty',
+      });
+      return;
+    }
+
+    if (orderIds.length > 100) {
+      res.status(400).json({
+        error: 'Bad Request',
+        message: 'Batch size exceeds maximum limit of 100 order IDs',
+      });
+      return;
+    }
+
+    const areAllValidStrings = orderIds.every(
+      (id): id is string => typeof id === 'string' && id.trim().length > 0,
+    );
+
+    if (!areAllValidStrings) {
+      res.status(400).json({
+        error: 'Bad Request',
+        message: 'All elements in orderIds must be non-empty strings',
+      });
+      return;
+    }
+
+    const uniqueIds = Array.from(new Set(orderIds.map((id) => id.trim())));
+
+    // Security Requirement: Only update orders belonging to authenticated user
+    const updateResult = await prisma.paymentOrder.updateMany({
+      where: {
+        id: { in: uniqueIds },
+        userId,
+        deletedAt: null,
+      },
+      data: {
+        deletedAt: new Date(),
+      },
+    });
+
+    res.json({
+      success: true,
+      deletedCount: updateResult.count,
+      message: `Successfully removed ${updateResult.count} order(s) from history`,
+    });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Internal Server Error';
+    console.error('[DELETE_USER_ORDERS_BATCH_ERROR]', error);
+    res.status(500).json({ error: msg });
+  }
+}
+
+// ─── DELETE /api/v1/payments/orders/history ──────────────────────────────────
+
+/**
+ * Clears all order history for authenticated user via soft delete.
+ * Only affects records with deletedAt = null belonging to authenticated userId.
+ */
+export async function clearUserOrderHistory(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized', message: 'Authentication required' });
+      return;
+    }
+
+    const updateResult = await prisma.paymentOrder.updateMany({
+      where: {
+        userId,
+        deletedAt: null,
+      },
+      data: {
+        deletedAt: new Date(),
+      },
+    });
+
+    res.json({
+      success: true,
+      deletedCount: updateResult.count,
+      message: 'Order history cleared successfully',
+    });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Internal Server Error';
+    console.error('[CLEAR_USER_ORDER_HISTORY_ERROR]', error);
     res.status(500).json({ error: msg });
   }
 }

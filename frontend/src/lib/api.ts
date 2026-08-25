@@ -1671,6 +1671,54 @@ export async function fetchUserOrders(limit = 50, skip = 0): Promise<UserOrdersR
   return payload as UserOrdersResponse;
 }
 
+/**
+ * DELETE /api/v1/payments/orders/:orderId
+ * Removes a single order from authenticated user's history (Soft Delete).
+ */
+export async function deleteUserOrder(
+  orderId: string,
+): Promise<{ success: boolean; orderId: string; message: string }> {
+  return apiRequest<{ success: boolean; orderId: string; message: string }>(
+    `/payments/orders/${encodeURIComponent(orderId)}`,
+    {
+      method: 'DELETE',
+    },
+  );
+}
+
+/**
+ * POST /api/v1/payments/orders/delete-batch
+ * Batch removes multiple orders from authenticated user's history (Soft Delete).
+ */
+export async function deleteUserOrdersBatch(
+  orderIds: string[],
+): Promise<{ success: boolean; deletedCount: number; message: string }> {
+  return apiRequest<{ success: boolean; deletedCount: number; message: string }>(
+    '/payments/orders/delete-batch',
+    {
+      method: 'POST',
+      body: JSON.stringify({ orderIds }),
+    },
+  );
+}
+
+/**
+ * DELETE /api/v1/payments/orders/history
+ * Clears entire order history for authenticated user (Soft Delete).
+ */
+export async function clearUserOrderHistory(): Promise<{
+  success: boolean;
+  deletedCount: number;
+  message: string;
+}> {
+  return apiRequest<{ success: boolean; deletedCount: number; message: string }>(
+    '/payments/orders/history',
+    {
+      method: 'DELETE',
+    },
+  );
+}
+
 export interface OrderStatusResponse {
   success: boolean;
   orderCode: string;
@@ -2292,6 +2340,9 @@ export const api = {
   abortVoiceSession,
   fetchUserOrders,
   fetchPaymentOrderStatus,
+  deleteUserOrder,
+  deleteUserOrdersBatch,
+  clearUserOrderHistory,
 };
 
 

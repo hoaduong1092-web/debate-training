@@ -133,10 +133,12 @@ model PaymentOrder {
   rawWebhookData Json?            @map("raw_webhook_data")
   createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt      DateTime?        @map("deleted_at") @db.Timestamptz()
 
   user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+  @@index([userId, deletedAt])
   @@index([status])
   @@index([provider, transactionId])
   @@map("payment_orders")

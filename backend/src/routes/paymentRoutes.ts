@@ -22,6 +22,9 @@ import {
   createCheckoutSession,
   getUserOrders,
   getOrderStatus,
+  deleteUserOrder,
+  deleteUserOrdersBatch,
+  clearUserOrderHistory,
   handleVNPayIpn,
   handleMoMoIpn,
   handleSePayWebhook,
@@ -33,6 +36,15 @@ const router = Router();
 
 // GET /api/v1/payments/orders (Phase C1-A User Transaction History)
 router.get('/orders', authenticate, getUserOrders as unknown as RequestHandler);
+
+// DELETE /api/v1/payments/orders/history (Clear entire order history for authenticated user)
+router.delete('/orders/history', authenticate, clearUserOrderHistory as unknown as RequestHandler);
+
+// POST /api/v1/payments/orders/delete-batch (Batch soft-delete multiple orders)
+router.post('/orders/delete-batch', authenticate, deleteUserOrdersBatch as unknown as RequestHandler);
+
+// DELETE /api/v1/payments/orders/:orderId (Single order soft-delete by UUID id)
+router.delete('/orders/:orderId', authenticate, deleteUserOrder as unknown as RequestHandler);
 
 // GET /api/v1/payments/status/:orderCode (Phase C1-A Live Order Status Polling)
 router.get('/status/:orderCode', authenticate, getOrderStatus as unknown as RequestHandler);

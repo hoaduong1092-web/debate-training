@@ -29,6 +29,11 @@ import {
   Layers,
   Clock,
   Receipt,
+  Trash2,
+  CheckSquare,
+  Square,
+  X,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   UserProfileResponse,
@@ -37,6 +42,9 @@ import {
   fetchSubscriptionPlans,
   fetchVoiceEntitlement,
   fetchUserOrders,
+  deleteUserOrder,
+  deleteUserOrdersBatch,
+  clearUserOrderHistory,
   PaymentOrderDTO,
   VoiceEntitlementResult,
   ArenaApiError,
@@ -110,6 +118,116 @@ export default function ProfileTab({
 
   // Pricing Modal Trigger
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
+
+  // Order History Management State
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    type: 'single' | 'batch' | 'all';
+    targetOrder?: PaymentOrderDTO;
+    count?: number;
+  } | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Auto-dismiss toast after 3.5s
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  const allOrderIds = orders.map((o) => o.id);
+  const isAllSelected = allOrderIds.length > 0 && allOrderIds.every((id) => selectedOrderIds.has(id));
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedOrderIds(new Set());
+    } else {
+      setSelectedOrderIds(new Set(allOrderIds));
+    }
+  };
+
+  const handleToggleSelectOrder = (orderId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setSelectedOrderIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) {
+        next.delete(orderId);
+      } else {
+        next.add(orderId);
+      }
+      return next;
+    });
+  };
+
+  const handleSingleDeleteClick = (order: PaymentOrderDTO, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConfirmModal({
+      isOpen: true,
+      type: 'single',
+      targetOrder: order,
+    });
+  };
+
+  const handleBatchDeleteClick = () => {
+    if (selectedOrderIds.size === 0) return;
+    setConfirmModal({
+      isOpen: true,
+      type: 'batch',
+      count: selectedOrderIds.size,
+    });
+  };
+
+  const handleClearAllClick = () => {
+    if (orders.length === 0) return;
+    setConfirmModal({
+      isOpen: true,
+      type: 'all',
+      count: orders.length,
+    });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!confirmModal) return;
+    setIsDeleting(true);
+    try {
+      if (confirmModal.type === 'single' && confirmModal.targetOrder) {
+        const targetId = confirmModal.targetOrder.id;
+        await deleteUserOrder(targetId);
+        setOrders((prev) => prev.filter((o) => o.id !== targetId));
+        setSelectedOrderIds((prev) => {
+          const next = new Set(prev);
+          next.delete(targetId);
+          return next;
+        });
+        setToast({ message: t.ordersDeleteSuccess, type: 'success' });
+      } else if (confirmModal.type === 'batch') {
+        const targetIds = Array.from(selectedOrderIds);
+        await deleteUserOrdersBatch(targetIds);
+        setOrders((prev) => prev.filter((o) => !selectedOrderIds.has(o.id)));
+        setSelectedOrderIds(new Set());
+        setToast({
+          message: t.ordersDeleteBatchSuccess.replace('{n}', String(targetIds.length)),
+          type: 'success',
+        });
+      } else if (confirmModal.type === 'all') {
+        await clearUserOrderHistory();
+        setOrders([]);
+        setSelectedOrderIds(new Set());
+        setIsSelectMode(false);
+        setToast({ message: t.ordersDeleteAllSuccess, type: 'success' });
+      }
+      setConfirmModal(null);
+    } catch (err) {
+      console.error('[ProfileTab] Delete error:', err);
+      setToast({ message: t.ordersDeleteError, type: 'error' });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -780,30 +898,86 @@ export default function ProfileTab({
 
       {/* ── 6. Lịch Sử Giao Dịch & Đơn Hàng (Phase C1-A User Transaction History) ── */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h3 className="text-lg font-black flex items-center gap-2 text-slate-900 dark:text-white">
               <Receipt size={18} className="text-indigo-500" />
-              <span>{language === 'vi' ? 'Lịch Sử Giao Dịch & Đơn Hàng' : 'Order & Payment History'}</span>
+              <span>{t.ordersTitle}</span>
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              {language === 'vi'
-                ? 'Danh sách các đơn hàng nạp hạn ngạch, nâng cấp gói hội viên và kích hoạt VIP Pass.'
-                : 'History of quota top-ups, subscription plan activations, and VIP Time Passes.'}
+              {t.ordersSubtitle}
             </p>
           </div>
-          <span className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400">
-            {orders.length} {language === 'vi' ? 'đơn hàng' : 'orders'}
-          </span>
+
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <span className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400">
+              {orders.length} {t.ordersCount}
+            </span>
+
+            {orders.length > 0 && !isSelectMode && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIsSelectMode(true)}
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <CheckSquare size={13} />
+                  <span>{t.ordersManage}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleClearAllClick}
+                  className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Trash2 size={13} />
+                  <span>{t.ordersDeleteAll}</span>
+                </button>
+              </>
+            )}
+
+            {isSelectMode && (
+              <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+                <span className="text-xs font-bold px-2 text-indigo-600 dark:text-indigo-400">
+                  {t.ordersSelectedCount.replace('{n}', String(selectedOrderIds.size))}
+                </span>
+
+                {selectedOrderIds.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleBatchDeleteClick}
+                    className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition flex items-center gap-1 shadow-sm cursor-pointer"
+                  >
+                    <Trash2 size={12} />
+                    <span>{t.ordersDeleteSelected.replace('{n}', String(selectedOrderIds.size))}</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSelectMode(false);
+                    setSelectedOrderIds(new Set());
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 text-xs font-bold transition cursor-pointer"
+                >
+                  {t.ordersCancelSelect}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {orders.length === 0 ? (
-          <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-center text-xs text-slate-500 dark:text-slate-400">
-            <p className="mb-2">🧾 {language === 'vi' ? 'Chưa có giao dịch thanh toán nào được ghi nhận.' : 'No payment transactions recorded yet.'}</p>
-            <p className="text-[11px] text-slate-400">
-              {language === 'vi'
-                ? 'Khi bạn đăng ký gói cước hoặc nạp lẻ hạn ngạch, các đơn hàng sẽ được lưu vết đầy đủ tại đây.'
-                : 'When you purchase a subscription or add-on pack, your orders will appear here.'}
+          <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center text-xs text-slate-500 dark:text-slate-400 space-y-2">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center mx-auto mb-2 text-xl">
+              🧾
+            </div>
+            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+              {t.ordersEmptyTitle}
+            </h4>
+            <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+              {t.ordersEmptySubtitle}
             </p>
           </div>
         ) : (
@@ -812,12 +986,29 @@ export default function ProfileTab({
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-slate-500 font-semibold">
+                    {isSelectMode && (
+                      <th className="py-3 px-3 w-10 text-center">
+                        <button
+                          type="button"
+                          onClick={handleToggleSelectAll}
+                          className="text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer flex items-center justify-center mx-auto"
+                          title={isAllSelected ? t.ordersDeselectAll : t.ordersSelectAll}
+                        >
+                          {isAllSelected ? (
+                            <CheckSquare size={16} className="text-indigo-600 dark:text-indigo-400" />
+                          ) : (
+                            <Square size={16} />
+                          )}
+                        </button>
+                      </th>
+                    )}
                     <th className="py-3 px-4">{language === 'vi' ? 'Mã Đơn' : 'Order Code'}</th>
                     <th className="py-3 px-4">{language === 'vi' ? 'Mặt Hàng' : 'Item'}</th>
                     <th className="py-3 px-4">{language === 'vi' ? 'Số Tiền' : 'Amount'}</th>
                     <th className="py-3 px-4">{language === 'vi' ? 'Cổng TT' : 'Gateway'}</th>
                     <th className="py-3 px-4">{language === 'vi' ? 'Trạng Thái' : 'Status'}</th>
                     <th className="py-3 px-4">{language === 'vi' ? 'Thời Gian' : 'Date'}</th>
+                    <th className="py-3 px-4 text-right">{language === 'vi' ? 'Thao Tác' : 'Action'}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
@@ -825,6 +1016,7 @@ export default function ProfileTab({
                     const isPaid = ord.status === 'PAID';
                     const isPending = ord.status === 'PENDING';
                     const isFailed = ord.status === 'FAILED';
+                    const isSelected = selectedOrderIds.has(ord.id);
 
                     const statusBadge = isPaid
                       ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
@@ -843,7 +1035,30 @@ export default function ProfileTab({
                       : ord.status;
 
                     return (
-                      <tr key={ord.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition">
+                      <tr
+                        key={ord.id}
+                        onClick={isSelectMode ? (e) => handleToggleSelectOrder(ord.id, e) : undefined}
+                        className={`transition ${
+                          isSelected
+                            ? 'bg-indigo-50/60 dark:bg-indigo-950/30'
+                            : 'hover:bg-slate-50/50 dark:hover:bg-slate-800/40'
+                        } ${isSelectMode ? 'cursor-pointer' : ''}`}
+                      >
+                        {isSelectMode && (
+                          <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={(e) => handleToggleSelectOrder(ord.id, e)}
+                              className="text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer flex items-center justify-center mx-auto"
+                            >
+                              {isSelected ? (
+                                <CheckSquare size={16} className="text-indigo-600 dark:text-indigo-400" />
+                              ) : (
+                                <Square size={16} />
+                              )}
+                            </button>
+                          </td>
+                        )}
                         <td className="py-3 px-4 font-bold text-slate-800 dark:text-slate-200">
                           {ord.orderCode}
                         </td>
@@ -868,6 +1083,16 @@ export default function ProfileTab({
                         </td>
                         <td className="py-3 px-4 text-slate-500 text-[11px] font-sans">
                           {formatDate(ord.createdAt, language)}
+                        </td>
+                        <td className="py-3 px-4 text-right font-sans" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={(e) => handleSingleDeleteClick(ord, e)}
+                            title={t.ordersDeleteSingle}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </td>
                       </tr>
                     );
@@ -925,6 +1150,82 @@ export default function ProfileTab({
           )}
         </div>
       </div>
+
+      {/* ── Order Deletion Confirmation Modal ── */}
+      {confirmModal?.isOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+                confirmModal.type === 'all'
+                  ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                  : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
+              }`}>
+                {confirmModal.type === 'all' ? <AlertTriangle size={20} /> : <Trash2 size={20} />}
+              </div>
+              <div>
+                <h4 className="text-base font-black text-slate-900 dark:text-white">
+                  {confirmModal.type === 'single'
+                    ? t.ordersDeleteSingleConfirmTitle
+                    : confirmModal.type === 'batch'
+                    ? t.ordersDeleteBatchConfirmTitle.replace('{n}', String(confirmModal.count || 0))
+                    : t.ordersDeleteAllConfirmTitle}
+                </h4>
+              </div>
+            </div>
+
+            <div className="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-line leading-relaxed bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+              {confirmModal.type === 'single'
+                ? t.ordersDeleteSingleConfirmBody
+                : confirmModal.type === 'batch'
+                ? t.ordersDeleteBatchConfirmBody
+                : t.ordersDeleteAllConfirmBody}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setConfirmModal(null)}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition cursor-pointer"
+              >
+                {t.ordersCancelBtn}
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => void handleConfirmDelete()}
+                className={`px-4 py-2.5 rounded-xl text-white text-xs font-bold transition shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+                  confirmModal.type === 'all'
+                    ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/30'
+                    : 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/25'
+                }`}
+              >
+                {isDeleting && <RefreshCw size={13} className="animate-spin" />}
+                <span>
+                  {confirmModal.type === 'all'
+                    ? t.ordersConfirmDeleteAllBtn
+                    : t.ordersConfirmDeleteBtn}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Toast Notification ── */}
+      {toast && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl shadow-xl border text-xs font-bold flex items-center gap-2.5 animate-slide-up ${
+            toast.type === 'success'
+              ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500/40 text-emerald-800 dark:text-emerald-200'
+              : 'bg-rose-50 dark:bg-rose-950 border-rose-500/40 text-rose-800 dark:text-rose-200'
+          }`}
+        >
+          {toast.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+          <span>{toast.message}</span>
+        </div>
+      )}
 
       {/* ── Pricing Modal Overlay ── */}
       <PricingModal
