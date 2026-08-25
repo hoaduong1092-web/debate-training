@@ -866,6 +866,68 @@ export async function createMotionAnalysis(body: MotionAnalysisRequest): Promise
 /** Alias for createMotionAnalysis conforming to Step 3.3 */
 export const analyzeMotion = createMotionAnalysis;
 
+// ─── Argument Refinement Types & API (AI_ARGUMENT_REFINEMENT_SPEC.md §11) ───
+
+/** Request body for POST /api/v1/arguments/refine. */
+export interface ArgumentRefinementRequest {
+  rawText: string;
+  stance: 'AFFIRMATIVE' | 'NEGATIVE';
+  topic?: string;
+  existingClaim?: string;
+  existingReasoning?: string;
+  existingEvidenceSuggestion?: string;
+  language?: 'vi' | 'en';
+}
+
+/** C-R-E candidate returned by AI Argument Refinement. */
+export interface ArgumentRefinementCandidate {
+  claim: string;
+  reasoning: string;
+  evidenceSuggestion: string;
+  refinementNote: string;
+}
+
+/** Response envelope for POST /api/v1/arguments/refine. */
+export interface ArgumentRefinementResponse {
+  success: boolean;
+  data: ArgumentRefinementCandidate;
+}
+
+/**
+ * POST /api/v1/arguments/refine
+ * AI Argument Refinement — refines raw user idea into structured C-R-E format.
+ * Consumes 1 ASSISTANT credit on success only (post-validate semantics).
+ * Spec: AI_ARGUMENT_REFINEMENT_SPEC.md §11
+ */
+export async function refineArgument(body: ArgumentRefinementRequest): Promise<ArgumentRefinementResponse> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const response = await fetch(`${API_BASE_URL}/arguments/refine`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    throw new ArenaApiError(response.status, extractErrorMessage(payload));
+  }
+
+  if (!payload || typeof payload !== 'object') {
+    throw new ArenaApiError(response.status, 'Invalid response payload.');
+  }
+
+  return payload as ArgumentRefinementResponse;
+}
+
 // ─── Plaza Domain Types ──────────────────────────────────────────────────────
 
 /** A single item in the Plaza Feed. */

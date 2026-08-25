@@ -41,8 +41,10 @@ import {
   WorkspaceCounterargument,
   FinalDebateDraft,
   ArenaHandoffPayload,
+  ArgumentRefinementCandidate,
   createSpeechDraft,
   createMotionAnalysis,
+  refineArgument,
 } from '../lib/api';
 
 // ─── Storage Types & Constants ────────────────────────────────────────────────
@@ -733,6 +735,119 @@ function SpeechDraftView({
     });
   };
 
+  // ─── AI Argument Refinement State (Per-Card, Transient Only) ────────────────
+  // Spec: AI_ARGUMENT_REFINEMENT_SPEC.md §18–§20
+  const [refinementCandidates, setRefinementCandidates] = useState<Record<string, ArgumentRefinementCandidate | null>>({});
+  const [refinementLoading, setRefinementLoading] = useState<Record<string, boolean>>({});
+  const [refinementErrors, setRefinementErrors] = useState<Record<string, string | null>>({});
+  // Request sequence counter to protect against stale responses.
+  const [refinementSeq, setRefinementSeq] = useState<Record<string, number>>({});
+
+  // Clear refinement state when workspace args change (e.g., card deleted).
+  useEffect(() => {
+    const activeIds = new Set(workspaceArgs.map((a) => a.argumentId));
+    setRefinementCandidates((prev) => {
+      const next: typeof prev = {};
+      for (const [k, v] of Object.entries(prev)) {
+        if (activeIds.has(k)) next[k] = v;
+      }
+      return next;
+    });
+    setRefinementLoading((prev) => {
+      const next: typeof prev = {};
+      for (const [k, v] of Object.entries(prev)) {
+        if (activeIds.has(k)) next[k] = v;
+      }
+      return next;
+    });
+    setRefinementErrors((prev) => {
+      const next: typeof prev = {};
+      for (const [k, v] of Object.entries(prev)) {
+        if (activeIds.has(k)) next[k] = v;
+      }
+      return next;
+    });
+  }, [workspaceArgs.length]);
+
+  const handleRefineArg = async (arg: WorkspaceArgument) => {
+    const argId = arg.argumentId;
+
+    // In-flight lock: prevent double-click.
+    if (refinementLoading[argId]) return;
+
+    // Build rawText from existing card content.
+    const rawParts: string[] = [];
+    if (arg.claim.trim()) rawParts.push(arg.claim.trim());
+    if (arg.reasoning.trim()) rawParts.push(arg.reasoning.trim());
+    if (arg.evidenceSuggestion.trim()) rawParts.push(arg.evidenceSuggestion.trim());
+    const rawText = rawParts.join('. ') || arg.claim.trim();
+
+    if (!rawText || rawText.trim().length < 5) {
+      setRefinementErrors((prev) => ({ ...prev, [argId]: isVi ? 'Vui lòng nhập ít nhất 3 từ có nghĩa vào ô Luận điểm.' : 'Please enter at least 3 meaningful words in the Claim field.' }));
+      return;
+    }
+
+    // Stale response protection: increment sequence counter.
+    const seq = (refinementSeq[argId] ?? 0) + 1;
+    setRefinementSeq((prev) => ({ ...prev, [argId]: seq }));
+
+    setRefinementLoading((prev) => ({ ...prev, [argId]: true }));
+    setRefinementErrors((prev) => ({ ...prev, [argId]: null }));
+    setRefinementCandidates((prev) => ({ ...prev, [argId]: null }));
+
+    try {
+      const response = await refineArgument({
+        rawText: rawText.slice(0, 500),
+        stance: stance as 'AFFIRMATIVE' | 'NEGATIVE',
+        topic: topic.trim() || undefined,
+        existingClaim: arg.claim.trim() || undefined,
+        existingReasoning: arg.reasoning.trim() || undefined,
+        existingEvidenceSuggestion: arg.evidenceSuggestion.trim() || undefined,
+        language: isVi ? 'vi' : 'en',
+      });
+
+      // Stale response guard: only apply if this is still the latest request.
+      setRefinementSeq((currentSeq) => {
+        if ((currentSeq[argId] ?? 0) !== seq) {
+          // Stale response — discard silently.
+          return currentSeq;
+        }
+        // Valid response — set candidate.
+        setRefinementCandidates((prev) => ({ ...prev, [argId]: response.data }));
+        return currentSeq;
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Đã xảy ra lỗi. Vui lòng thử lại.';
+      setRefinementErrors((prev) => ({ ...prev, [argId]: msg }));
+    } finally {
+      setRefinementLoading((prev) => ({ ...prev, [argId]: false }));
+    }
+  };
+
+  const handleAcceptRefinement = (argId: string) => {
+    const candidate = refinementCandidates[argId];
+    if (!candidate) return;
+
+    // Apply candidate to WorkspaceArgument — preserves argumentId and order.
+    setWorkspaceArgs((prev) =>
+      prev.map((a) =>
+        a.argumentId === argId
+          ? { ...a, claim: candidate.claim, reasoning: candidate.reasoning, evidenceSuggestion: candidate.evidenceSuggestion }
+          : a,
+      ),
+    );
+
+    // Clear candidate state.
+    setRefinementCandidates((prev) => ({ ...prev, [argId]: null }));
+    setRefinementErrors((prev) => ({ ...prev, [argId]: null }));
+  };
+
+  const handleRejectRefinement = (argId: string) => {
+    // Discard candidate — preserve original content.
+    setRefinementCandidates((prev) => ({ ...prev, [argId]: null }));
+    setRefinementErrors((prev) => ({ ...prev, [argId]: null }));
+  };
+
   // ─── Validation (Derived from Live Data) ──────────────────────────────────
   const isTopicValid = topic.trim().length > 0;
   const hasMinArgs = workspaceArgs.length >= 1;
@@ -1006,6 +1121,102 @@ function SpeechDraftView({
                         placeholder={isVi ? 'Gợi ý số liệu, báo cáo, thực tế...' : 'Data points, studies, or examples...'}
                         className="w-full text-xs text-emerald-800 dark:text-emerald-300 bg-emerald-50/50 dark:bg-slate-950/80 p-2 rounded-xl border border-emerald-200 dark:border-emerald-500/20 focus:outline-none focus:border-emerald-500 transition"
                       />
+                    </div>
+
+                    {/* AI Argument Refinement Button & Candidate Preview */}
+                    {/* Spec: AI_ARGUMENT_REFINEMENT_SPEC.md §9, §20 */}
+                    <div className="flex flex-col gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/60 mt-1">
+                      <button
+                        type="button"
+                        disabled={!!refinementLoading[arg.argumentId] || !arg.claim.trim()}
+                        onClick={() => handleRefineArg(arg)}
+                        className="self-start px-3 py-1.5 bg-violet-50 dark:bg-violet-500/10 hover:bg-violet-100 dark:hover:bg-violet-500/20 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-500/30 text-xs font-bold rounded-xl transition flex items-center gap-1.5 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {refinementLoading[arg.argumentId] ? (
+                          <>
+                            <Loader2 size={13} className="animate-spin" />
+                            <span>{isVi ? 'AI đang tối ưu hóa...' : 'AI Refining...'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles size={13} />
+                            <span>{isVi ? 'Hiệu chỉnh bằng AI' : 'AI Refine'}</span>
+                          </>
+                        )}
+                      </button>
+
+                      {/* Error Display */}
+                      {refinementErrors[arg.argumentId] && (
+                        <div className="text-[11px] text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/20 px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-500/20 flex items-center gap-1.5">
+                          <AlertCircle size={12} />
+                          <span>{refinementErrors[arg.argumentId]}</span>
+                        </div>
+                      )}
+
+                      {/* Candidate Preview Panel */}
+                      {refinementCandidates[arg.argumentId] && (
+                        <div className="bg-violet-50/80 dark:bg-violet-950/30 rounded-xl border border-violet-200 dark:border-violet-500/25 p-3 flex flex-col gap-2.5 shadow-sm">
+                          <div className="flex items-center gap-1.5">
+                            <Sparkles size={13} className="text-violet-500" />
+                            <span className="text-[11px] font-bold text-violet-700 dark:text-violet-300 uppercase tracking-wider">
+                              {isVi ? 'Bản Đề Xuất C-R-E (AI Suggestion)' : 'AI C-R-E Suggestion'}
+                            </span>
+                          </div>
+                          {/* Claim Preview */}
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[10px] font-semibold text-violet-600 dark:text-violet-400">
+                              {isVi ? 'Claim đề xuất:' : 'Suggested Claim:'}
+                            </span>
+                            <p className="text-xs text-slate-800 dark:text-slate-200 bg-white/80 dark:bg-slate-900/60 p-2 rounded-lg border border-violet-100 dark:border-violet-500/15">
+                              {refinementCandidates[arg.argumentId]!.claim}
+                            </p>
+                          </div>
+                          {/* Reasoning Preview */}
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[10px] font-semibold text-violet-600 dark:text-violet-400">
+                              {isVi ? 'Reasoning đề xuất:' : 'Suggested Reasoning:'}
+                            </span>
+                            <p className="text-xs text-slate-800 dark:text-slate-200 bg-white/80 dark:bg-slate-900/60 p-2 rounded-lg border border-violet-100 dark:border-violet-500/15">
+                              {refinementCandidates[arg.argumentId]!.reasoning}
+                            </p>
+                          </div>
+                          {/* Evidence Suggestion Preview */}
+                          {refinementCandidates[arg.argumentId]!.evidenceSuggestion && (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                📚 {isVi ? 'Evidence Suggestion đề xuất:' : 'Suggested Evidence Direction:'}
+                              </span>
+                              <p className="text-xs text-emerald-800 dark:text-emerald-300 bg-white/80 dark:bg-slate-900/60 p-2 rounded-lg border border-emerald-100 dark:border-emerald-500/15">
+                                {refinementCandidates[arg.argumentId]!.evidenceSuggestion}
+                              </p>
+                            </div>
+                          )}
+                          {/* Refinement Note */}
+                          {refinementCandidates[arg.argumentId]!.refinementNote && (
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 italic px-1">
+                              💡 {refinementCandidates[arg.argumentId]!.refinementNote}
+                            </div>
+                          )}
+                          {/* Accept / Reject Buttons */}
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => handleAcceptRefinement(arg.argumentId)}
+                              className="px-3.5 py-1.5 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold rounded-xl shadow transition active:scale-95 flex items-center gap-1.5"
+                            >
+                              <CheckCircle2 size={13} />
+                              <span>{isVi ? 'Áp dụng' : 'Apply'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRejectRefinement(arg.argumentId)}
+                              className="px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl transition active:scale-95 flex items-center gap-1.5"
+                            >
+                              <span>{isVi ? 'Bỏ qua' : 'Dismiss'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
