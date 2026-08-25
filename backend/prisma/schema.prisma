@@ -47,7 +47,6 @@ model SubscriptionPlan {
   createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz()
 
   subscriptions   UserSubscription[]
-  orders          PaymentOrder[]
 
   @@map("subscription_plans")
 }
@@ -136,7 +135,6 @@ model PaymentOrder {
   updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plan           SubscriptionPlan @relation(fields: [planId], references: [id])
 
   @@index([userId, createdAt])
   @@index([status])
