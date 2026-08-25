@@ -1557,9 +1557,13 @@ export async function fetchSubscriptionPlans(): Promise<PlansResponse> {
 export async function createCheckoutSession(
   payload: CreateCheckoutSessionRequest,
 ): Promise<CreateCheckoutSessionResponse> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const response = await fetch(`${API_BASE_URL}/payments/checkout`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(payload),
   });
 
@@ -1584,9 +1588,13 @@ export async function createCheckoutSession(
 export async function sandboxDirectUpgrade(
   payload: SandboxUpgradeRequest,
 ): Promise<SandboxUpgradeResponse> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const response = await fetch(`${API_BASE_URL}/payments/sandbox-upgrade`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(payload),
   });
 
@@ -1611,9 +1619,13 @@ export async function sandboxDirectUpgrade(
 export async function notifyPaymentWebhook(
   payload: WebhookSimulationRequest,
 ): Promise<WebhookSimulationResponse> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const response = await fetch(`${API_BASE_URL}/payments/webhook`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(payload),
   });
 
@@ -1714,9 +1726,13 @@ export interface RedeemInviteResponse {
 export async function redeemTeamInvite(
   invitationCode: string,
 ): Promise<RedeemInviteResponse> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const response = await fetch(`${API_BASE_URL}/teams/redeem`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ invitationCode }),
   });
 
@@ -1739,9 +1755,13 @@ export async function redeemTeamInvite(
  * Fetch user's team groups, seat rosters, and invitation codes.
  */
 export async function fetchMyTeams(): Promise<MyTeamsResponse> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const response = await fetch(`${API_BASE_URL}/teams/my-teams`, {
     method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
   });
 
   let data: unknown;
