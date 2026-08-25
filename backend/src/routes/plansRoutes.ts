@@ -5,13 +5,14 @@
  */
 
 import { Router, RequestHandler } from 'express';
-import { authenticate } from '../middleware/auth';
+import { authenticate, type AuthRequest } from '../middleware/auth';
 import { getSubscriptionPlans } from '../controllers/userController';
 
 const router = Router();
 
 // GET /api/v1/plans
 // Returns dynamic subscription tier catalogue read directly from Database (SubscriptionPlan model).
-router.get('/', authenticate, getSubscriptionPlans as unknown as RequestHandler);
+// Public endpoint — zero LLM calls, zero sensitive data.
+router.get('/', (req, res) => getSubscriptionPlans(req as unknown as AuthRequest, res));
 
 export default router;
