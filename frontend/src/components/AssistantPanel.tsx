@@ -817,7 +817,7 @@ function SpeechDraftView({
         return currentSeq;
       });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Đã xảy ra lỗi. Vui lòng thử lại.';
+      const msg = mapApiError(err, isVi);
       setRefinementErrors((prev) => ({ ...prev, [argId]: msg }));
     } finally {
       setRefinementLoading((prev) => ({ ...prev, [argId]: false }));
