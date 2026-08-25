@@ -4,15 +4,17 @@
  * Features:
  *  - Strict locale filtering: only vi-VN voices play Vietnamese text.
  *    Never falls back to a foreign synthesiser for Vietnamese.
- *  - Neural/Online voice priority: Google Tiếng Việt, Microsoft HoaiMy/NamMinh.
+ *  - Neural/Online voice priority: Google Tiếng Việt, Microsoft HoaiMy/NamMinh, iOS Linh/An.
  *  - Gender-aware selection: female / male persona.
  *  - Sentence-chunk cadence: splits long text at punctuation and injects
- *    micro-pauses between utterances for natural debate delivery.
+ *    micro-pauses (120ms) between utterances for natural debate delivery and
+ *    immunity against mobile WebKit 15-second utterance cutoff bugs.
  *  - Safe interlock: stopActiveSpeech() is idempotent and always safe to call.
- *  - Graceful no-op when SpeechSynthesis is unavailable.
  *  - Single-session playback state machine with generation tokens.
  *  - Anti-duplicate fallback: audio.onerror + playPromise.catch only trigger
  *    one SpeechSynthesis fallback per session.
+ *  - Circuit breaker: when backend TTS endpoint is offline (503), fast-paths
+ *    subsequent speech directly to SpeechSynthesis (0ms latency, zero media pipeline disruption).
  *  - Correct onEnd lifecycle: 'canceled'/'interrupted' errors are NOT treated
  *    as normal end-of-playback events.
  */
@@ -73,6 +75,10 @@ function getSynth(): SpeechSynthesis | null {
 let sharedAudioElement: HTMLAudioElement | null = null;
 let sharedAudioContext: AudioContext | null = null;
 let isAudioPipelineUnlocked = false;
+
+// Circuit-breaker for backend TTS availability.
+// When backend returns 503, sets to false to bypass failing network calls on future speech.
+let backendTtsAvailable: boolean | null = null;
 
 export function getOrCreateAudioElement(): HTMLAudioElement | null {
   if (typeof window === 'undefined') return null;
@@ -143,14 +149,15 @@ export function unlockAudioPipeline(): void {
   }
 
   // 3. Pre-warm SpeechSynthesis on mobile browsers
+  // Speaks a 1-character silent utterance without cancel() so WebKit audio queue unlocks cleanly
   const synth = getSynth();
   if (synth) {
     try {
       if (synth.paused) synth.resume();
-      const silentUtter = new SpeechSynthesisUtterance('');
-      silentUtter.volume = 0;
+      const silentUtter = new SpeechSynthesisUtterance(' ');
+      silentUtter.volume = 0.01;
+      silentUtter.rate = 10;
       synth.speak(silentUtter);
-      synth.cancel();
     } catch {}
   }
 
@@ -165,6 +172,15 @@ if (typeof window !== 'undefined') {
   window.addEventListener('click', globalInteractionHandler, { capture: true, passive: true });
   window.addEventListener('touchstart', globalInteractionHandler, { capture: true, passive: true });
   window.addEventListener('keydown', globalInteractionHandler, { capture: true, passive: true });
+
+  // Pre-load voices on voiceschanged
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.onvoiceschanged = () => {
+      try {
+        window.speechSynthesis.getVoices();
+      } catch {}
+    };
+  }
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -196,7 +212,7 @@ export type SpeakOptions = TTSOptions;
  *
  * Priority tiers (Vietnamese):
  *   T1 (90+): Google Tiếng Việt, Microsoft HoaiMy Online, Microsoft NamMinh Online
- *   T2 (70+): Any "Online" / "Natural" voice
+ *   T2 (70+): Any "Online" / "Natural" / "Neural" voice, iOS Linh / An
  *   T3 (50+): Any other vi-VN voice
  *   T4 (0):   Non-Vietnamese voice (rejected for vi-VN requests)
  */
@@ -206,7 +222,7 @@ function scoreVoice(v: SpeechSynthesisVoice, lang: TtsLang, gender: TtsGender): 
 
   // Hard reject: wrong language family for the requested locale.
   if (lang === 'vi-VN') {
-    const isVietnamese = voiceLang.startsWith('vi') || voiceLang.includes('vie');
+    const isVietnamese = voiceLang.startsWith('vi') || voiceLang.includes('vie') || voiceLang.includes('vn');
     if (!isVietnamese) return -1; // strictly rejected
   } else {
     const targetPrefix = (lang.split('-')[0] ?? lang).toLowerCase();
@@ -219,21 +235,20 @@ function scoreVoice(v: SpeechSynthesisVoice, lang: TtsLang, gender: TtsGender): 
   if (name.includes('google') && name.includes('tiếng việt')) score += 45;
   else if (name.includes('hoaimy') || name.includes('hoài my')) score += 42;
   else if (name.includes('namminh') || name.includes('nam minh')) score += 40;
-  else if (name.includes('online') || name.includes('natural') || name.includes('neural')) score += 25;
-  else if (name.includes('microsoft') || name.includes('google')) score += 15;
+  else if (name.includes('online') || name.includes('natural') || name.includes('neural') || name.includes('enhanced') || name.includes('premium')) score += 25;
+  else if (name.includes('microsoft') || name.includes('google') || name.includes('apple')) score += 15;
 
   // Gender preference boost.
   const isFemale =
     name.includes('female') || name.includes('woman') || name.includes('girl') ||
-    name.includes('hoài my') || name.includes('hoaimy') || name.includes('female') ||
+    name.includes('hoài my') || name.includes('hoaimy') ||
     name.includes('nữ') || name.includes('nu ') ||
-    // Heuristic: names with typical female Vietnamese names
     name.includes('lan') || name.includes('mai') || name.includes('thu') || name.includes('linh');
 
   const isMale =
     name.includes('male') || name.includes('man') || name.includes('boy') ||
     name.includes('namminh') || name.includes('nam minh') ||
-    name.includes('nam') || name.includes('hùng') || name.includes('hung');
+    name.includes('nam') || name.includes('hùng') || name.includes('hung') || name.includes('an');
 
   if (gender === 'female' && isFemale) score += 10;
   if (gender === 'male' && isMale) score += 10;
@@ -246,13 +261,6 @@ function scoreVoice(v: SpeechSynthesisVoice, lang: TtsLang, gender: TtsGender): 
 
 /**
  * Pick the best available voice for a given locale and gender preference.
- *
- * Returns null if:
- *   - No voices are loaded yet (call when voiceschanged fires).
- *   - No voice matches the strict locale requirement (vi-VN request → no vi voice).
- *
- * A null return for vi-VN means we should warn the user rather than
- * playing with a foreign synthesiser.
  */
 export function getBestVoice(lang: TtsLang = 'vi-VN', gender: TtsGender = 'female'): SpeechSynthesisVoice | null {
   const synth = getSynth();
@@ -284,7 +292,7 @@ export function getBestVoice(lang: TtsLang = 'vi-VN', gender: TtsGender = 'femal
     return prefixMatch;
   }
 
-  // If no Vietnamese voice is available in the browser, return null rather than using an English synthesizer
+  // If no Vietnamese voice is available in the browser, return null so OS default is used
   if (lang === 'vi-VN') {
     return null;
   }
@@ -295,7 +303,6 @@ export function getBestVoice(lang: TtsLang = 'vi-VN', gender: TtsGender = 'femal
 
 /**
  * Returns true if a valid voice for the given locale is available.
- * Use this to detect "no Vietnamese voice installed" before speaking.
  */
 export function hasVoiceForLang(lang: TtsLang): boolean {
   return getBestVoice(lang) !== null;
@@ -332,18 +339,14 @@ function cleanForSpeech(text: string): string {
 /** Minimum character count for a chunk to be worth speaking as a separate utterance. */
 const MIN_CHUNK_LEN = 8;
 /** Maximum characters in a single utterance before we force-split. */
-const MAX_CHUNK_LEN = 180;
+const MAX_CHUNK_LEN = 160;
 
 /**
- * Split text into sentence-level chunks for natural cadence.
- *
+ * Split text into sentence-level chunks for natural cadence and WebKit safety.
  * Splits on Vietnamese/English sentence terminators: `.`, `!`, `?`, `；`, `;`, `\n`.
- * Merges very short fragments with the next chunk to avoid choppy micro-utterances.
  */
 export function splitIntoChunks(text: string): string[] {
-  // Primary split on sentence-ending punctuation, keeping the delimiter.
   const raw = text.split(/(?<=[.!?；;\n])\s*/);
-
   const chunks: string[] = [];
 
   for (const part of raw) {
@@ -359,7 +362,6 @@ export function splitIntoChunks(text: string): string[] {
         else if (chunks.length > 0) chunks[chunks.length - 1] += ' ' + st;
       }
     } else if (trimmed.length < MIN_CHUNK_LEN && chunks.length > 0) {
-      // Merge tiny fragments with previous chunk.
       chunks[chunks.length - 1] += ' ' + trimmed;
     } else {
       chunks.push(trimmed);
@@ -371,12 +373,6 @@ export function splitIntoChunks(text: string): string[] {
 
 // ─── Playback Session & Generation Token ─────────────────────────────────────
 
-/**
- * Monotonically increasing generation counter.
- * Incremented every time stopActiveSpeech() is called.
- * Any in-flight async operation checks this before starting/continuing —
- * if the generation has changed, the playback attempt is silently dropped.
- */
 let playbackGeneration = 0;
 let currentPlaySessionId = 0;
 let currentAudioElement: HTMLAudioElement | null = null;
@@ -409,16 +405,17 @@ export function logVoiceDebateDiagnostics(diag: VoiceDebateDiagnostics): void {
   }));
 }
 
-// ─── SpeechSynthesis Fallback ────────────────────────────────────────────────
+// ─── SpeechSynthesis Sequential Chunk Playback ───────────────────────────────
 
 /**
- * Play text via browser SpeechSynthesis.
+ * Play text via browser SpeechSynthesis with natural inter-sentence chunking.
  *
  * CRITICAL LIFECYCLE RULES:
- * 1. 'canceled' / 'interrupted' onerror events do NOT call options.onEnd().
- * 2. Only the current generation's callbacks are allowed to update state.
- * 3. options.onStart() is called from utter.onstart (actual audio begins).
- * 4. options.onEnd() is called from utter.onend (normal completion only).
+ * 1. Chunks are spoken sequentially with a 120ms natural pause between sentences.
+ * 2. This completely avoids the mobile WebKit 15-second speech cutoff bug.
+ * 3. 'canceled' / 'interrupted' onerror events do NOT call options.onEnd().
+ * 4. options.onStart() is called once on the first chunk's utter.onstart.
+ * 5. options.onEnd() is called once after the final chunk completes.
  */
 function playSpeechSynthesisFallback(
   text: string,
@@ -426,9 +423,8 @@ function playSpeechSynthesisFallback(
   sessionId: number,
   generation: number,
 ): void {
-  // Check generation BEFORE starting — if user already pressed Stop, bail out
   if (generation !== playbackGeneration) {
-    console.info('[TTS Source] SpeechSynthesis cancelled: generation mismatch (stop was pressed)');
+    console.info('[TTS Source] SpeechSynthesis cancelled: generation mismatch before start');
     return;
   }
 
@@ -439,84 +435,119 @@ function playSpeechSynthesisFallback(
     options.onEnd?.();
     return;
   }
+  const activeSynth = synth;
 
-  try {
-    // Do NOT call synth.cancel() here — that would kill a prior utterance
-    // and trigger its onerror('canceled'), which is exactly the bug we fixed.
-    if (synth.paused) {
-      synth.resume();
+  const chunks = splitIntoChunks(text);
+  if (chunks.length === 0) {
+    setPlaybackState('ended');
+    options.onEnd?.();
+    return;
+  }
+
+  const targetLang = options.lang || 'vi-VN';
+  const voice = getBestVoice(targetLang, options.gender || 'male');
+
+  if (voice) {
+    console.info(`[TTS Source] source=browser_speech_synthesis | chunks=${chunks.length} | voiceName=${voice.name} | lang=${voice.lang}`);
+  } else {
+    console.info(`[TTS Source] source=browser_speech_synthesis | chunks=${chunks.length} | voiceName=OS_default | lang=${targetLang}`);
+  }
+
+  let currentChunkIdx = 0;
+  let hasStarted = false;
+
+  function speakNextChunk(): void {
+    if (generation !== playbackGeneration || sessionId !== currentPlaySessionId) {
+      return;
     }
-
-    const targetLang = options.lang || 'vi-VN';
-    const voice = getBestVoice(targetLang, options.gender || 'male');
-    const utter = new SpeechSynthesisUtterance(text);
-
-    if (voice) {
-      utter.voice = voice;
-      console.info(`[TTS Source] source=browser_speech_synthesis | voiceName=${voice.name} | lang=${voice.lang}`);
-    } else {
-      console.info(`[TTS Source] source=browser_speech_synthesis | voiceName=OS_default | lang=${targetLang}`);
-    }
-    utter.lang = targetLang;
-    utter.rate = options.rate || 1.0;
-    utter.pitch = options.pitch || 1.0;
-    utter.volume = options.volume ?? 1.0;
-
-    utter.onstart = () => {
-      // Verify generation — user may have pressed Stop between speak() and actual start
-      if (generation !== playbackGeneration) {
-        synth.cancel();
-        return;
-      }
-      console.info('[TTS Source] SpeechSynthesis onstart — audio actually playing');
-      setPlaybackState('playing_speech');
-      options.onStart?.();
-    };
-
-    utter.onend = () => {
-      // Only process if this is still the active session
-      if (generation !== playbackGeneration) return;
-      if (sessionId !== currentPlaySessionId) return;
-      console.info('[TTS Source] SpeechSynthesis onend — normal completion');
+    if (currentChunkIdx >= chunks.length) {
+      console.info('[TTS Source] SpeechSynthesis finished all chunks — normal completion');
       setPlaybackState('ended');
       options.onEnd?.();
-    };
+      return;
+    }
 
-    utter.onerror = (e) => {
-      // CRITICAL: 'canceled' and 'interrupted' are NOT real errors.
-      // They are triggered by synth.cancel() (from stopActiveSpeech or from
-      // a new speech session replacing this one). Do NOT call onEnd() for these.
-      const errorType = e.error;
-      if (errorType === 'canceled' || errorType === 'interrupted') {
-        console.info(`[TTS Source] SpeechSynthesis onerror: ${errorType} (internal cancel, NOT calling onEnd)`);
-        return;
+    try {
+      if (activeSynth.paused) {
+        activeSynth.resume();
       }
-      console.warn('[TTS Source] SpeechSynthesis onerror:', errorType);
-      if (generation !== playbackGeneration) return;
-      if (sessionId !== currentPlaySessionId) return;
+
+      const chunkText = chunks[currentChunkIdx];
+      const utter = new SpeechSynthesisUtterance(chunkText);
+      if (voice) {
+        utter.voice = voice;
+      }
+      utter.lang = targetLang;
+      utter.rate = options.rate || 1.0;
+      utter.pitch = options.pitch || 1.0;
+      utter.volume = options.volume ?? 1.0;
+
+      utter.onstart = () => {
+        if (generation !== playbackGeneration || sessionId !== currentPlaySessionId) {
+          activeSynth.cancel();
+          return;
+        }
+        if (!hasStarted) {
+          hasStarted = true;
+          console.info('[TTS Source] SpeechSynthesis onstart — audio actually playing');
+          setPlaybackState('playing_speech');
+          options.onStart?.();
+        }
+      };
+
+      utter.onend = () => {
+        if (generation !== playbackGeneration || sessionId !== currentPlaySessionId) return;
+        currentChunkIdx++;
+        if (currentChunkIdx < chunks.length) {
+          // Small 120ms natural pause between sentences for human-like debate delivery
+          setTimeout(() => {
+            if (generation === playbackGeneration && sessionId === currentPlaySessionId) {
+              speakNextChunk();
+            }
+          }, 120);
+        } else {
+          console.info('[TTS Source] SpeechSynthesis onend — all chunks completed');
+          setPlaybackState('ended');
+          options.onEnd?.();
+        }
+      };
+
+      utter.onerror = (e) => {
+        const errorType = e.error;
+        if (errorType === 'canceled' || errorType === 'interrupted') {
+          console.info(`[TTS Source] SpeechSynthesis onerror: ${errorType} (internal cancel, NOT calling onEnd)`);
+          return;
+        }
+        console.warn(`[TTS Source] SpeechSynthesis chunk error (${errorType}) at chunk ${currentChunkIdx}`);
+        if (generation !== playbackGeneration || sessionId !== currentPlaySessionId) return;
+
+        currentChunkIdx++;
+        if (currentChunkIdx < chunks.length) {
+          speakNextChunk();
+        } else {
+          setPlaybackState('error');
+          options.onEnd?.();
+        }
+      };
+
+      setPlaybackState(hasStarted ? 'playing_speech' : 'requesting');
+      activeSynth.speak(utter);
+    } catch (err: any) {
+      console.warn('[TTS Source] SpeechSynthesis speak exception:', err);
+      if (generation !== playbackGeneration || sessionId !== currentPlaySessionId) return;
       setPlaybackState('error');
       options.onEnd?.();
-    };
-
-    setPlaybackState('requesting');
-    synth.speak(utter);
-  } catch (err: any) {
-    console.warn('[TTS Source] SpeechSynthesis exception:', err);
-    if (generation !== playbackGeneration) return;
-    setPlaybackState('error');
-    options.onEnd?.();
+    }
   }
+
+  speakNextChunk();
 }
 
 // ─── Audio Stream Playback ───────────────────────────────────────────────────
 
 /**
- * Single-pass continuous audio playback from backend TTS endpoint.
- * Reuses the persistent shared HTMLAudioElement to prevent mobile autoplay rejections.
- *
- * CRITICAL: Uses a `fallbackTriggered` flag to ensure only ONE fallback to
- * SpeechSynthesis per playback session, even when both audio.onerror AND
- * playPromise.catch fire for the same 503 error.
+ * Continuous audio playback from backend TTS or direct SpeechSynthesis.
+ * Reuses the persistent shared HTMLAudioElement.
  */
 function playAudioStream(
   text: string,
@@ -524,7 +555,6 @@ function playAudioStream(
   sessionId: number,
   generation: number,
 ): void {
-  // Check generation BEFORE starting
   if (generation !== playbackGeneration) {
     console.info('[Voice AutoPlay] Playback cancelled: generation mismatch before audio stream');
     options.onEnd?.();
@@ -532,7 +562,18 @@ function playAudioStream(
   }
 
   const voiceParam = options.voiceId || (options.gender === 'male' ? 'sonTung' : 'default_vi');
+  const hasDedicatedAudioUrl = !!options.audioUrl;
+  const isDefaultTtsEndpoint = !hasDedicatedAudioUrl;
   const audioSourceUrl = options.audioUrl || (text ? `/api/v1/voice/tts?text=${encodeURIComponent(text)}&voice=${encodeURIComponent(voiceParam)}&lang=vi` : null);
+
+  // ═══ CIRCUIT BREAKER ═══
+  // If backend default TTS endpoint is known offline (e.g. Railway without VoiceStudio),
+  // skip the failing HTTP request and use SpeechSynthesis directly with 0ms latency.
+  if (isDefaultTtsEndpoint && backendTtsAvailable === false) {
+    console.info('[TTS Source] Backend TTS known offline — using SpeechSynthesis directly (0ms latency)');
+    playSpeechSynthesisFallback(text, options, sessionId, generation);
+    return;
+  }
 
   if (!audioSourceUrl) {
     console.info('[TTS Source] No audio URL available, using browser SpeechSynthesis directly');
@@ -543,9 +584,6 @@ function playAudioStream(
   console.info(`[TTS Source] Attempting backend audio: ${audioSourceUrl.substring(0, 80)}...`);
   setPlaybackState('requesting');
 
-  // ═══ ANTI-DUPLICATE FALLBACK FLAG ═══
-  // Both audio.onerror and playPromise.catch can fire for the same HTTP 503.
-  // This flag ensures playSpeechSynthesisFallback is called AT MOST ONCE.
   let fallbackTriggered = false;
 
   function triggerFallbackOnce(): void {
@@ -555,33 +593,45 @@ function playAudioStream(
     }
     fallbackTriggered = true;
 
-    // Re-check generation before fallback
-    if (generation !== playbackGeneration) {
+    // Mark default backend TTS as offline so future speech fast-paths to SpeechSynthesis
+    if (isDefaultTtsEndpoint) {
+      backendTtsAvailable = false;
+    }
+
+    // Cleanly release HTMLAudioElement before SpeechSynthesis
+    if (audio) {
+      try {
+        audio.pause();
+        audio.removeAttribute('src');
+        audio.load();
+      } catch {}
+    }
+
+    if (generation !== playbackGeneration || sessionId !== currentPlaySessionId) {
       console.info('[TTS Source] Fallback cancelled: generation mismatch');
       options.onEnd?.();
-      return;
-    }
-    if (sessionId !== currentPlaySessionId) {
       return;
     }
     console.warn('[TTS Source] Backend audio failed → falling back to browser SpeechSynthesis (once)');
     playSpeechSynthesisFallback(text, options, sessionId, generation);
   }
 
-  // Reuse the persistent shared audio player to prevent mobile autoplay restrictions
   const audio = getOrCreateAudioElement() || new Audio();
   currentAudioElement = audio;
 
   audio.onplay = () => {
     if (generation !== playbackGeneration) return;
     console.info('[TTS Source] HTMLAudioElement onplay — audio actually playing');
+    // Backend audio succeeded — mark backend TTS as online
+    if (isDefaultTtsEndpoint) {
+      backendTtsAvailable = true;
+    }
     setPlaybackState('playing_audio');
     options.onStart?.();
   };
 
   audio.onended = () => {
-    if (generation !== playbackGeneration) return;
-    if (sessionId !== currentPlaySessionId) return;
+    if (generation !== playbackGeneration || sessionId !== currentPlaySessionId) return;
     console.info('[TTS Source] HTMLAudioElement onended — normal completion');
     setPlaybackState('ended');
     options.onEnd?.();
@@ -599,13 +649,11 @@ function playAudioStream(
     if (playPromise !== undefined) {
       playPromise
         .then(() => {
-          // Verify generation is still valid after async play() resolves
           if (generation !== playbackGeneration) {
             audio.pause();
             audio.currentTime = 0;
             return;
           }
-          // onplay handler already set state to playing_audio
         })
         .catch((err) => {
           console.warn('[TTS Source] Audio play() rejection:', err?.name, err?.message);
@@ -635,11 +683,10 @@ export function speakOpponentResponse(
   // Stop any active speech before starting new one (increments generation)
   stopActiveSpeech();
   const sessionId = ++currentPlaySessionId;
-  const generation = playbackGeneration; // Capture current generation for this playback
+  const generation = playbackGeneration;
 
   console.info(`[Voice AutoPlay] speakOpponentResponse called | textLen=${cleaned.length} | generation=${generation} | audioUnlocked=${isAudioPipelineUnlocked}`);
 
-  // Stream Neural Audio or fallback smoothly to SpeechSynthesis
   playAudioStream(cleaned, options, sessionId, generation);
   return 'ok';
 }
@@ -656,12 +703,8 @@ export function speakText(text: string, options: SpeakOptions = {}): boolean {
  * Stop any currently playing speech immediately across both engines.
  * Resets audio player and cancels active speech synthesis.
  * Increments the playback generation to invalidate ALL in-flight async playback attempts.
- *
- * After calling this, no pending async callback (from audio.play().then, onerror fallback,
- * etc.) will be able to restart playback because the generation will have changed.
  */
 export function stopActiveSpeech(): void {
-  // 0. Invalidate ALL in-flight and future async playback for the old generation
   playbackGeneration++;
   currentPlaySessionId++;
 
@@ -673,12 +716,11 @@ export function stopActiveSpeech(): void {
     try {
       sharedAudioElement.pause();
       sharedAudioElement.currentTime = 0;
-      // Remove all event handlers to prevent stale callbacks
       sharedAudioElement.onplay = null;
       sharedAudioElement.onended = null;
       sharedAudioElement.onerror = null;
       sharedAudioElement.src = '';
-      sharedAudioElement.load(); // Forces browser to release the audio resource
+      sharedAudioElement.load();
     } catch {}
   }
   if (currentAudioElement && currentAudioElement !== sharedAudioElement) {
@@ -694,13 +736,13 @@ export function stopActiveSpeech(): void {
   }
   currentAudioElement = null;
 
-  // 2. Stop Web Speech Synthesis — IMMEDIATE cancel
-  // This will trigger utter.onerror('canceled') on active utterances, but our
-  // onerror handler now correctly ignores 'canceled'/'interrupted' errors.
+  // 2. Stop Web Speech Synthesis — only cancel if speaking or pending
   const synth = getSynth();
   if (synth) {
     try {
-      synth.cancel();
+      if (synth.speaking || synth.pending) {
+        synth.cancel();
+      }
     } catch {}
   }
 

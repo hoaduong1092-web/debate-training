@@ -583,9 +583,18 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
     };
   }, []);
 
-  // Cut off speech and user audio playback when switching turns in Arena
-  useEffect(() => {
+  // Manual turn navigation by user (from MatchHeader or Turn tabs)
+  const handleManualSelectTurn = useCallback((turnIdx: number) => {
     stopActiveSpeech();
+    if (userAudioRef.current) {
+      userAudioRef.current.pause();
+      setUserAudioPlayingTurn(null);
+    }
+    setSelectedTurn(turnIdx);
+  }, []);
+
+  // Pause user recording audio playback when switching turns (do NOT stop opponent TTS here)
+  useEffect(() => {
     if (userAudioRef.current) {
       userAudioRef.current.pause();
       setUserAudioPlayingTurn(null);
@@ -1035,7 +1044,7 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
         onOpenAudioCheck={() => setShowAudioCheckModal(true)}
         turnsCount={turns.length}
         selectedTurn={selectedTurn}
-        setSelectedTurn={setSelectedTurn}
+        setSelectedTurn={handleManualSelectTurn}
         isCompleted={isCompleted}
         onOpenSummary={() => {
           if (turns.length > 0) {
@@ -1124,7 +1133,7 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
             setAutoPlayTts={setAutoPlayTts}
             turns={turns}
             selectedTurn={selectedTurn}
-            setSelectedTurn={setSelectedTurn}
+            setSelectedTurn={handleManualSelectTurn}
             inputText={inputText}
             setInputText={setInputText}
             onSendArgument={handleSendArgument}
