@@ -61,9 +61,9 @@ export interface OpponentResult {
 /**
  * Max tokens for opponent response.
  * For Gemini Thinking models (e.g. 2.0/2.5/3.6), internal <thought> reasoning consumes 500-1500 tokens.
- * Setting max_tokens = 3500 guarantees sufficient headroom for both thought generation and a rich 250-380 word rebuttal.
+ * Setting max_tokens = 4000 guarantees sufficient headroom for both thought generation and a rich 250-380 word rebuttal.
  */
-const OPPONENT_MAX_TOKENS = 3500;
+const OPPONENT_MAX_TOKENS = 4000;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

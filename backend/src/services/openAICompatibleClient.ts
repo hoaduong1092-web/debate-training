@@ -110,7 +110,7 @@ export function getOpponentModel(): string {
  * Reads MODEL_FALLBACK → gemini-2.5-flash.
  */
 export function getFallbackModel(): string {
-  return process.env.MODEL_FALLBACK || 'gemini-2.5-flash';
+  return process.env.MODEL_FALLBACK || 'gemini-3.5-flash';
 }
 
 /**
@@ -254,7 +254,7 @@ export async function createOpenAIChatCompletion(
       { role: 'user', content: request.userPrompt },
     ],
     temperature: request.temperature ?? 0.7,
-    max_tokens: request.max_tokens ?? 3500,
+    max_tokens: request.max_tokens ?? 4000,
   };
 
   if (request.response_format) {
@@ -292,7 +292,20 @@ export async function createOpenAIChatCompletion(
         throw new Error(`AI Provider error: ${payload.error.message || JSON.stringify(payload.error)}`);
       }
 
-      const rawContent = payload.choices?.[0]?.message?.content;
+      const firstChoice = payload.choices?.[0] as any;
+      const finishReason = firstChoice?.finish_reason;
+      if (finishReason === 'length') {
+        console.warn('[AI_TRUNCATION_WARNING]', {
+          model,
+          max_tokens: payloadBody.max_tokens,
+          finish_reason: finishReason,
+          prompt_tokens: payload.usage?.prompt_tokens,
+          completion_tokens: payload.usage?.completion_tokens,
+          hint: 'Output was truncated because completion reached max_tokens limit.',
+        });
+      }
+
+      const rawContent = firstChoice?.message?.content;
       let content =
         typeof rawContent === 'string' ? rawContent : rawContent != null ? String(rawContent) : '';
 
