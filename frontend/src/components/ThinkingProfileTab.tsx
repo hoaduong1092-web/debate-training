@@ -198,7 +198,7 @@ export const ThinkingProfileTab: React.FC<ThinkingProfileTabProps> = ({ language
                 {language === 'vi' ? 'Hồ Sơ Tư Duy & Cây Kỹ Năng' : 'Thinking Profile & Skill Tree'}
               </h1>
               <span className="px-2 py-0.5 text-[10px] font-mono font-bold bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 border border-indigo-500/20 rounded-md">
-                v16.0
+                v1.0
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">

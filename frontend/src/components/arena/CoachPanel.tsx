@@ -37,7 +37,7 @@ export const CoachDiagnosticsContent: React.FC<{
             {isVi ? 'Sẵn Sàng Chẩn Đoán Tư Duy' : 'Ready for Cognitive Diagnostics'}
           </h4>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            {isVi ? 'Hệ thống sẽ tự động bóc tách và phản hồi theo chuẩn Sư phạm v16 ngay khi bạn gửi lượt phát biểu đầu tiên.' : 'The system will automatically extract and evaluate your speech against pedagogical standards as soon as you submit your first turn.'}
+            {isVi ? 'Hệ thống sẽ tự động bóc tách và phản hồi theo chuẩn Sư phạm v1.0 ngay khi bạn gửi lượt phát biểu đầu tiên.' : 'The system will automatically extract and evaluate your speech against pedagogical standards as soon as you submit your first turn.'}
           </p>
         </div>
 
@@ -239,7 +239,7 @@ export const CoachPanel: React.FC<CoachPanelProps> = ({
           </svg>
           <span>Logic Coach HUD {currentTurnData ? `(${isVi ? 'Lượt' : 'Turn'} ${currentTurnData.turnNumber})` : ''}</span>
         </span>
-        <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">{isVi ? 'Chuẩn Sư phạm v16' : 'Pedagogical Standard v16'}</span>
+        <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">{isVi ? 'Chuẩn Sư phạm v1.0' : 'Pedagogical Standard v1.0'}</span>
       </div>
 
       <CoachDiagnosticsContent

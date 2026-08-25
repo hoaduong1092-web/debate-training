@@ -75,7 +75,7 @@ export const CoachBottomSheet: React.FC<CoachBottomSheetProps> = ({
                 )}
               </h3>
               <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-                {isVi ? 'Chuẩn Sư phạm v16 • Phân tích tư duy' : 'Pedagogical Standard v16'}
+                {isVi ? 'Chuẩn Sư phạm v1.0 • Phân tích tư duy' : 'Pedagogical Standard v1.0'}
               </p>
             </div>
           </div>

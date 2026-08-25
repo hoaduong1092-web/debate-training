@@ -449,7 +449,7 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
             <h3 className="text-base sm:text-xl font-black text-slate-900 dark:text-white flex items-center gap-2 sm:gap-2.5">
               <span>{selectedItem ? (language === 'vi' ? 'Thanh Toán Gói Hạn Ngạch' : 'Checkout & Activation') : (language === 'vi' ? 'Nâng Cấp Hạn Ngạch Thinking OS' : 'Upgrade Thinking OS Quota')}</span>
               <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30">
-                v16.0
+                v1.0
               </span>
             </h3>
             <p className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-400 mt-0.5 sm:mt-1">

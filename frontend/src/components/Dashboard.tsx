@@ -94,7 +94,7 @@ export const Dashboard: React.FC = () => {
                   THINKING OS
                 </span>
                 <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 border border-indigo-500/20 shadow-sm">
-                  v16.0
+                  v1.0
                 </span>
               </div>
             </div>
