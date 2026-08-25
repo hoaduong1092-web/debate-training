@@ -70,54 +70,63 @@ interface OpenAIApiResponse {
 
 /**
  * Resolved base URL.
- * Priority: BEEKNOEE_BASE_URL → OPENAI_BASE_URL → Groq fallback.
+ * Priority: GEMINI_BASE_URL → OPENAI_BASE_URL → BEEKNOEE_BASE_URL → Gemini default.
  */
 export function getOpenAIBaseUrl(): string {
   return (
-    process.env.BEEKNOEE_BASE_URL ||
+    process.env.GEMINI_BASE_URL ||
     process.env.OPENAI_BASE_URL ||
-    'https://api.groq.com/openai/v1'
+    process.env.BEEKNOEE_BASE_URL ||
+    'https://generativelanguage.googleapis.com/v1beta/openai'
   );
 }
 
 /**
  * Resolved model for general AI calls.
- * Priority: AI_MODEL → hardcoded fallback.
+ * Priority: AI_MODEL → gemini-3.6-flash.
  */
 export function getOpenAIModel(): string {
-  return process.env.AI_MODEL || 'llama-3.3-70b-versatile';
+  return process.env.AI_MODEL || 'gemini-3.6-flash';
 }
 
 /**
  * Resolved model for Logic Coach specifically.
- * Reads MODEL_LOGIC_COACH → claude-sonnet-4-6 (Free Quota on Beeknoee).
+ * Reads MODEL_LOGIC_COACH → AI_MODEL → gemini-3.6-flash.
  */
 export function getLogicCoachModel(): string {
-  return process.env.MODEL_LOGIC_COACH || 'claude-sonnet-4-6';
+  return process.env.MODEL_LOGIC_COACH || process.env.AI_MODEL || 'gemini-3.6-flash';
 }
 
 /**
  * Resolved model for AI Opponent specifically.
- * Reads MODEL_OPPONENT → claude-sonnet-4-6 (Free Quota on Beeknoee).
+ * Reads MODEL_OPPONENT → AI_MODEL → gemini-3.6-flash.
  */
 export function getOpponentModel(): string {
-  return process.env.MODEL_OPPONENT || 'claude-sonnet-4-6';
+  return process.env.MODEL_OPPONENT || process.env.AI_MODEL || 'gemini-3.6-flash';
 }
 
 /**
  * Resolved API key.
- * Priority: BEEKNOEE_API_KEY → OPENAI_API_KEY → empty string.
+ * Priority: GEMINI_API_KEY → OPENAI_API_KEY → BEEKNOEE_API_KEY → empty string.
  */
 export function getOpenAIApiKey(): string {
-  return process.env.BEEKNOEE_API_KEY || process.env.OPENAI_API_KEY || '';
+  return (
+    process.env.GEMINI_API_KEY ||
+    process.env.OPENAI_API_KEY ||
+    process.env.BEEKNOEE_API_KEY ||
+    ''
+  );
 }
 
 /**
  * Returns the gateway name for telemetry tagging.
- * 'beeknoee' when BEEKNOEE_BASE_URL is configured, otherwise 'openai-compatible'.
  */
 export function getGatewayName(): string {
-  return process.env.BEEKNOEE_BASE_URL ? 'beeknoee' : 'openai-compatible';
+  const url = getOpenAIBaseUrl();
+  if (url.includes('googleapis.com')) return 'gemini';
+  if (url.includes('beeknoee')) return 'beeknoee';
+  if (url.includes('groq')) return 'groq';
+  return 'openai-compatible';
 }
 
 // ─── Safe JSON Extractor ─────────────────────────────────────────────────────
@@ -261,8 +270,23 @@ export async function createOpenAIChatCompletion(
     }
 
     const rawContent = payload.choices?.[0]?.message?.content;
-    const content =
+    let content =
       typeof rawContent === 'string' ? rawContent : rawContent != null ? String(rawContent) : '';
+
+    // Strip <thought>...</thought> reasoning blocks if returned by thinking models
+    if (content.includes('</thought>')) {
+      content = content.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
+    }
+
+    // Detect upstream rate-limit or blocked messages returned with HTTP 200
+    if (
+      (payload as any).id?.startsWith('blocked-') ||
+      content.startsWith('⚠️') ||
+      content.includes('Quá nhiều yêu cầu song song') ||
+      content.includes('Số dư tài khoản API không đủ')
+    ) {
+      throw new Error(`AI Provider Rate Limit / Blocked: ${content.slice(0, 200)}`);
+    }
 
     const usage = payload.usage ?? {};
     return {
