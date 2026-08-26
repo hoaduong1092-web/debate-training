@@ -61,26 +61,30 @@ export async function executeWithMetering(params: AICallParams) {
         estimatedCostUsd = cost.estimatedCostUsd;
       }
 
-      console.log(`[Telemetry] task=${params.taskName} model=${params.modelName} inTokens=${inputTokens} outTokens=${outputTokens} costUsd=${estimatedCostUsd} ms=${executionMs} gateway=${pricingSource}`);
+      const callStatus = response?.finish_reason === 'length' ? 'TRUNCATED' : succeeded ? 'SUCCESS' : 'FAILED';
+      console.log(`[Telemetry] task=${params.taskName} model=${params.modelName} inTokens=${inputTokens} outTokens=${outputTokens} costUsd=${estimatedCostUsd} latencyMs=${executionMs} finishReason=${response?.finish_reason || 'stop'} status=${callStatus} gateway=${pricingSource}`);
 
-      // Persist to UsageLog
-      try {
-        const { PrismaClient } = require('@prisma/client');
-        const prisma = new PrismaClient();
-        await prisma.usageLog.create({
-          data: {
-            sessionId: params.sessionId,
-            turnNumber: params.turnNumber ?? 0,
-            model: params.modelName,
-            promptTokens: inputTokens,
-            completionTokens: outputTokens,
-            totalTokens: inputTokens + outputTokens,
-            costUsd: estimatedCostUsd || 0,
-            latencyMs: executionMs,
-          },
-        });
-      } catch (e) {
-        console.error('[UsageLog] Failed to persist telemetry:', e);
+      // Persist to UsageLog (only if sessionId is a valid DebateSession UUID)
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.sessionId || '');
+      if (isUUID) {
+        try {
+          const { PrismaClient } = require('@prisma/client');
+          const prisma = new PrismaClient();
+          await prisma.usageLog.create({
+            data: {
+              sessionId: params.sessionId,
+              turnNumber: params.turnNumber ?? 0,
+              model: params.modelName,
+              promptTokens: inputTokens,
+              completionTokens: outputTokens,
+              totalTokens: inputTokens + outputTokens,
+              costUsd: estimatedCostUsd || 0,
+              latencyMs: executionMs,
+            },
+          });
+        } catch (e) {
+          console.error('[UsageLog] Failed to persist telemetry:', e);
+        }
       }
     }
   }

@@ -301,7 +301,7 @@ export const HistoryTab: React.FC<Props> = ({ onStartNewDebate, language = 'vi',
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 w-full sm:w-auto flex-wrap">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between w-full sm:w-auto">
           {/* Search Box */}
           <div className="relative flex-1 sm:w-60 min-w-[180px]">
             <input
@@ -318,7 +318,7 @@ export const HistoryTab: React.FC<Props> = ({ onStartNewDebate, language = 'vi',
             <button
               type="button"
               onClick={handleDeleteSelected}
-              className="min-h-[44px] px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition flex items-center gap-1.5 active:scale-95 shrink-0 cursor-pointer shadow-md shadow-rose-600/30"
+              className="min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 active:scale-95 shrink-0 cursor-pointer shadow-md shadow-rose-600/30"
               title={language === 'vi' ? 'Xóa các bản ghi đã tích chọn' : 'Delete selected records'}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -333,7 +333,7 @@ export const HistoryTab: React.FC<Props> = ({ onStartNewDebate, language = 'vi',
             <button
               type="button"
               onClick={handleDeleteAll}
-              className="min-h-[44px] px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/30 text-xs font-bold transition flex items-center gap-1.5 active:scale-95 shrink-0 cursor-pointer shadow-sm"
+              className="min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/30 text-xs font-bold transition flex items-center justify-center gap-1.5 active:scale-95 shrink-0 cursor-pointer shadow-sm"
               title={language === 'vi' ? 'Xóa toàn bộ các bản ghi lịch sử' : 'Delete all history records'}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -530,7 +530,7 @@ export const HistoryTab: React.FC<Props> = ({ onStartNewDebate, language = 'vi',
                       e.stopPropagation();
                       setSelectedReplayId(session.id);
                     }}
-                    className="min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 transition flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+                    className="min-h-[44px] min-w-[44px] px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 transition flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
                   >
                     <span>▶ {language === 'vi' ? 'Xem Replay' : 'Watch Replay'}</span>
                   </button>

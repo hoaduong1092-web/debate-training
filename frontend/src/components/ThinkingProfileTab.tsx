@@ -214,7 +214,7 @@ export const ThinkingProfileTab: React.FC<ThinkingProfileTabProps> = ({ language
           {/* Confidence Badge */}
           {confidence && (
             <div
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold min-h-[40px] ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold min-h-[44px] ${
                 confidence.level === 'HIGH'
                   ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
                   : confidence.level === 'MEDIUM'
@@ -242,7 +242,7 @@ export const ThinkingProfileTab: React.FC<ThinkingProfileTabProps> = ({ language
                 key={p}
                 type="button"
                 onClick={() => setPeriod(p)}
-                className={`min-h-[40px] px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                className={`min-h-[44px] px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                   period === p
                     ? 'bg-indigo-600 text-white shadow-sm font-bold'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -264,7 +264,7 @@ export const ThinkingProfileTab: React.FC<ThinkingProfileTabProps> = ({ language
             onClick={() => loadData(period)}
             title={language === 'vi' ? 'Làm mới dữ liệu' : 'Refresh data'}
             aria-label={language === 'vi' ? 'Làm mới dữ liệu' : 'Refresh data'}
-            className="min-h-[40px] min-w-[40px] p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 hover:bg-slate-200 dark:bg-slate-950 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-indigo-400 transition-all cursor-pointer flex items-center justify-center active:scale-95"
+            className="min-h-[44px] min-w-[44px] p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 hover:bg-slate-200 dark:bg-slate-950 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-indigo-400 transition-all cursor-pointer flex items-center justify-center active:scale-95"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
@@ -514,10 +514,10 @@ export const ThinkingProfileTab: React.FC<ThinkingProfileTabProps> = ({ language
                 return (
                   <div
                     key={idx}
-                    className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800/80 transition-all hover:border-indigo-500/30"
+                    className="min-h-[44px] p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800/80 transition-all hover:border-indigo-500/30"
                   >
                     <div
-                      className="flex items-center justify-between cursor-pointer"
+                      className="flex items-center justify-between cursor-pointer min-h-[44px]"
                       onClick={() => setExpandedFallacy(isExpanded ? null : item.name)}
                     >
                       <div className="flex items-center gap-2.5">
@@ -704,7 +704,7 @@ export const ThinkingProfileTab: React.FC<ThinkingProfileTabProps> = ({ language
         </div>
 
         {/* Level Nodes Visual List */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
           {skillLevels.map(node => {
             const isCurrent = node.isCurrentLevel;
             const isUnlocked = node.unlocked;
@@ -723,7 +723,7 @@ export const ThinkingProfileTab: React.FC<ThinkingProfileTabProps> = ({ language
               <div
                 key={node.level}
                 onClick={() => setSelectedSkillLevel(node)}
-                className={`relative p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+                className={`relative min-h-[44px] p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
                   isCurrent
                     ? 'bg-gradient-to-b from-indigo-500/15 to-purple-500/10 border-indigo-500/50 shadow-lg shadow-indigo-500/10 ring-1 ring-indigo-500/30'
                     : isUnlocked

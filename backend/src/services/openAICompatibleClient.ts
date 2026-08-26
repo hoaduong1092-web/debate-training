@@ -41,6 +41,7 @@ export interface OpenAIChatRequest {
 
 export interface OpenAIChatResult {
   content: string;
+  finish_reason?: 'stop' | 'length' | 'tool_calls' | 'content_filter' | string;
   usage: {
     prompt_tokens: number;
     completion_tokens: number;
@@ -51,6 +52,7 @@ export interface OpenAIChatResult {
 
 interface OpenAIApiResponse {
   choices?: Array<{
+    finish_reason?: string;
     message?: {
       content?: unknown;
     };
@@ -230,10 +232,20 @@ async function executeSingleChatCompletion(
   }
 }
 
+let mockChatCompletionFn: ((request: OpenAIChatRequest, isFallback?: boolean) => Promise<OpenAIChatResult>) | null = null;
+
+export function setMockChatCompletion(fn: typeof mockChatCompletionFn): void {
+  mockChatCompletionFn = fn;
+}
+
 export async function createOpenAIChatCompletion(
   request: OpenAIChatRequest,
   isFallbackAttempt = false,
 ): Promise<OpenAIChatResult> {
+  if (mockChatCompletionFn) {
+    return await mockChatCompletionFn(request, isFallbackAttempt);
+  }
+
   const apiKey = getOpenAIApiKey();
   const baseUrl = getOpenAIBaseUrl();
   const model = request.model || getOpenAIModel();
@@ -329,6 +341,7 @@ export async function createOpenAIChatCompletion(
       const usage = payload.usage ?? {};
       return {
         content,
+        finish_reason: typeof finishReason === 'string' ? finishReason : 'stop',
         usage: {
           prompt_tokens: typeof usage.prompt_tokens === 'number' ? usage.prompt_tokens : 0,
           completion_tokens:

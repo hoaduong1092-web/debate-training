@@ -47,7 +47,8 @@ export const SparringFeed: React.FC<SparringFeedProps> = ({
         {currentTurnData && (
           <div className="glass-panel-elevated rounded-2xl p-4 border border-indigo-200 dark:border-indigo-500/30 shadow-md flex flex-col gap-2.5 transition-all">
             {/* Header: User Badge + Turn + Telemetry */}
-            <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+              {/* Tier 1: Identity row */}
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-600/30 shrink-0">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -64,8 +65,8 @@ export const SparringFeed: React.FC<SparringFeedProps> = ({
                 </div>
               </div>
 
-              {/* Acoustic Telemetry & Audio Replay Button (touch target >= 44px) */}
-              <div className="flex items-center gap-1.5 flex-wrap">
+              {/* Tier 2: Telemetry/Actions row */}
+              <div className="flex items-center gap-2 flex-wrap">
                 {currentTurnData.logicScore !== null && (
                   <button
                     type="button"
@@ -128,7 +129,8 @@ export const SparringFeed: React.FC<SparringFeedProps> = ({
         {/* Mobile AI Opponent Speech Bubble */}
         <div className="glass-panel-elevated rounded-2xl p-4 border border-indigo-200 dark:border-indigo-500/30 shadow-lg shadow-indigo-500/5 flex flex-col gap-2.5 transition-all">
           {/* Header: Avatar + Bot Info + Audio Controls */}
-          <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+            {/* Tier 1: Identity row */}
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-cyan-500 p-0.5 shadow-md shadow-indigo-500/30 shrink-0">
                 <div className="w-full h-full bg-white dark:bg-slate-950 rounded-[10px] flex items-center justify-center">
@@ -152,8 +154,8 @@ export const SparringFeed: React.FC<SparringFeedProps> = ({
               </div>
             </div>
 
-            {/* AI Audio Controls (Touch targets >= 44px) */}
-            <div className="flex items-center gap-1.5">
+            {/* Tier 2: Telemetry/Actions row */}
+            <div className="flex items-center gap-2 flex-wrap">
               {inputMode === 'voice' && (
                 <button
                   type="button"

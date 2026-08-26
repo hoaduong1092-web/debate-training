@@ -508,7 +508,7 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition active:scale-95 cursor-pointer shrink-0 ml-2"
+            className="w-10 h-10 sm:w-9 sm:h-9 min-h-[44px] min-w-[44px] rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition active:scale-95 cursor-pointer shrink-0 ml-2"
           >
             ✕
           </button>
@@ -542,7 +542,7 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
                     type="button"
                     disabled={checkoutLoading}
                     onClick={() => handleSwitchProvider('SEPAY')}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                    className={`px-4 py-2 min-h-[44px] rounded-xl text-xs font-bold transition flex items-center gap-2 ${
                       provider === 'SEPAY'
                         ? 'bg-indigo-600 text-white shadow-md'
                         : 'bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400'
@@ -554,7 +554,7 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
                     type="button"
                     disabled={checkoutLoading}
                     onClick={() => handleSwitchProvider('VNPAY')}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                    className={`px-4 py-2 min-h-[44px] rounded-xl text-xs font-bold transition flex items-center gap-2 ${
                       provider === 'VNPAY'
                         ? 'bg-indigo-600 text-white shadow-md'
                         : 'bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400'
@@ -566,7 +566,7 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
                     type="button"
                     disabled={checkoutLoading}
                     onClick={() => handleSwitchProvider('MOMO')}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                    className={`px-4 py-2 min-h-[44px] rounded-xl text-xs font-bold transition flex items-center gap-2 ${
                       provider === 'MOMO'
                         ? 'bg-indigo-600 text-white shadow-md'
                         : 'bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400'
@@ -578,7 +578,7 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
                     type="button"
                     disabled={checkoutLoading}
                     onClick={() => handleSwitchProvider('SANDBOX')}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                    className={`px-4 py-2 min-h-[44px] rounded-xl text-xs font-bold transition flex items-center gap-2 ${
                       provider === 'SANDBOX'
                         ? 'bg-amber-600 text-white shadow-md'
                         : 'bg-slate-100 dark:bg-slate-900 text-amber-600 dark:text-amber-400'
@@ -596,7 +596,7 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
                       <img
                         src={checkoutData.qrData.qrImageUrl}
                         alt="VietQR Payment"
-                        className="w-56 h-56 rounded-lg shadow-sm"
+                        className="w-48 h-48 sm:w-56 sm:h-56 rounded-lg shadow-sm"
                       />
                       <p className="text-[10px] text-slate-500 mt-2 font-mono">Quét mã bằng app ngân hàng / Mobile Banking</p>
                     </div>
@@ -643,7 +643,7 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
                           type="button"
                           disabled={checkoutLoading}
                           onClick={handleCheckStatus}
-                          className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
+                          className="w-full py-2.5 min-h-[44px] bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
                         >
                           <span>🔄 {language === 'vi' ? 'Tôi Đã Chuyển Khoản (Kiểm Tra Ngay)' : 'Check Payment Status'}</span>
                         </button>
@@ -652,14 +652,14 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
                             type="button"
                             disabled={checkoutLoading}
                             onClick={handleSandboxSimulate}
-                            className="text-amber-600 dark:text-amber-400 hover:underline font-semibold cursor-pointer"
+                            className="text-amber-600 dark:text-amber-400 hover:underline font-semibold cursor-pointer min-h-[44px] flex items-center"
                           >
                             ⚡ {language === 'vi' ? 'Kích hoạt Thử nghiệm (Sandbox)' : 'Simulate Sandbox'}
                           </button>
                           <button
                             type="button"
                             onClick={() => setSelectedItem(null)}
-                            className="text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-bold cursor-pointer"
+                            className="text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-bold cursor-pointer min-h-[44px] flex items-center"
                           >
                             {language === 'vi' ? '← Chọn gói khác' : '← Choose another'}
                           </button>
@@ -673,19 +673,19 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
                     <p className="text-xs text-slate-600 dark:text-slate-300 max-w-md mx-auto">
                       Kích hoạt ngay <strong>{selectedItem.name}</strong> không cần thực hiện giao dịch tiền thật (Dành cho Development & Verification).
                     </p>
-                    <div className="flex justify-center gap-3">
+                    <div className="flex justify-center gap-3 flex-wrap">
                       <button
                         type="button"
                         disabled={checkoutLoading}
                         onClick={handleSandboxSimulate}
-                        className="px-6 py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-xl shadow-lg transition disabled:opacity-50"
+                        className="px-6 py-2.5 min-h-[44px] bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-xl shadow-lg transition disabled:opacity-50"
                       >
                         ⚡ Kích Hoạt Tức Thì (Sandbox)
                       </button>
                       <button
                         type="button"
                         onClick={() => setSelectedItem(null)}
-                        className="px-4 py-2.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs"
+                        className="px-4 py-2.5 min-h-[44px] bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs"
                       >
                         Quay lại
                       </button>
@@ -695,13 +695,13 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
                   <div className="bg-slate-50 dark:bg-slate-900/40 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 text-center space-y-4">
                     <h4 className="text-base font-bold">Chuyển hướng đến cổng thanh toán {provider}</h4>
                     <p className="text-xs text-slate-500">Mã đơn hàng: <span className="font-mono font-bold">{checkoutData?.orderCode}</span></p>
-                    <div className="flex justify-center gap-3">
+                    <div className="flex justify-center gap-3 flex-wrap">
                       {checkoutData?.checkoutUrl && (
                         <a
                           href={checkoutData.checkoutUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs inline-block shadow-lg"
+                          className="px-6 py-2.5 min-h-[44px] flex items-center justify-center bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs shadow-lg"
                         >
                           Mở Cổng Thanh Toán →
                         </a>
@@ -710,14 +710,14 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
                         type="button"
                         disabled={checkoutLoading}
                         onClick={handleSandboxSimulate}
-                        className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs disabled:opacity-50"
+                        className="px-4 py-2.5 min-h-[44px] bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs disabled:opacity-50"
                       >
                         Mô Phỏng Thành Công
                       </button>
                       <button
                         type="button"
                         onClick={() => setSelectedItem(null)}
-                        className="px-4 py-2.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs"
+                        className="px-4 py-2.5 min-h-[44px] bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs"
                       >
                         Quay lại
                       </button>
@@ -732,11 +732,11 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
           <>
             {/* Category Switcher: Subscription Plans vs Credit Packs vs VIP Passes */}
             <div className="flex justify-center mb-4">
-              <div className="bg-slate-100 dark:bg-slate-900 p-1 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-1">
+              <div className="bg-slate-100 dark:bg-slate-900 p-1 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-1 overflow-x-auto scrollbar-none max-w-full">
                 <button
                   type="button"
                   onClick={() => setPricingCategory('SUBSCRIPTION')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
                     pricingCategory === 'SUBSCRIPTION'
                       ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -747,7 +747,7 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
                 <button
                   type="button"
                   onClick={() => setPricingCategory('CREDIT_PACK')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
                     pricingCategory === 'CREDIT_PACK'
                       ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -758,7 +758,7 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
                 <button
                   type="button"
                   onClick={() => setPricingCategory('VIP')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
                     pricingCategory === 'VIP'
                       ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30'
                       : 'text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-200'
@@ -775,7 +775,7 @@ export const PricingModal: React.FC<Props> = ({ isOpen, onClose, language = 'vi'
             {/* Current Balance Overview */}
             <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-3.5 mb-4 flex flex-wrap items-center justify-between gap-3 text-xs">
               <div className="text-slate-600 dark:text-slate-400 font-semibold">{language === 'vi' ? 'Số dư hạn ngạch hiện tại:' : 'Current Quota Balance:'}</div>
-              <div className="flex items-center gap-3 font-mono font-bold">
+              <div className="flex flex-wrap items-center gap-2 font-mono font-bold">
                 <span className="text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-500/20">
                   {user?.quota?.textTurnsRemaining ?? 20} {language === 'vi' ? 'Lượt Text' : 'Text Turns'}
                 </span>

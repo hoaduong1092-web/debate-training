@@ -68,7 +68,7 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({
                     }
                   }}
                   disabled={!isCompletedTurn}
-                  className={`min-w-[40px] h-10 px-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition-all shrink-0 ${
+                  className={`min-w-[44px] min-h-[44px] px-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition-all shrink-0 ${
                     isSelected
                       ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 ring-2 ring-indigo-500/30'
                       : isCompletedTurn
@@ -99,7 +99,7 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({
                   alert(isVi ? 'Thực hiện ít nhất 1 lượt tranh biện để xem tổng kết.' : 'Complete at least 1 turn to view match summary.');
                 }
               }}
-              className={`min-w-[40px] h-10 px-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition-all shrink-0 ${
+              className={`min-w-[44px] min-h-[44px] px-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition-all shrink-0 ${
                 isCompleted
                   ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 cursor-pointer'
                   : turnsCount > 0
@@ -123,7 +123,7 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({
                   key={fmt}
                   type="button"
                   onClick={() => setFormat(fmt)}
-                  className={`min-w-[34px] h-9 px-1.5 rounded-lg font-bold transition text-xs cursor-pointer ${
+                  className={`min-w-[44px] min-h-[44px] px-1.5 rounded-lg font-bold transition text-xs cursor-pointer ${
                     format === fmt
                       ? 'bg-indigo-600 text-white shadow-sm'
                       : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
@@ -139,7 +139,7 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({
               <button
                 type="button"
                 onClick={() => setShowMobileMenu((prev) => !prev)}
-                className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-900/90 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 transition cursor-pointer active:scale-95 shadow-sm"
+                className="min-w-[44px] min-h-[44px] rounded-xl bg-slate-100 dark:bg-slate-900/90 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 transition cursor-pointer active:scale-95 shadow-sm"
                 aria-label={isVi ? 'Menu tùy chọn' : 'More options'}
                 title={isVi ? 'Thao tác bổ sung' : 'More options'}
               >

@@ -467,7 +467,7 @@ function DebateCard({
           {/* Like Button */}
           <button
             type="button"
-            className={`min-h-[44px] flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+            className={`min-h-[44px] min-w-[44px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
               item.is_liked
                 ? 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10'
                 : 'text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50/50 dark:hover:bg-rose-500/5'
@@ -517,7 +517,7 @@ function DebateCard({
         {/* Study Action Button */}
         <button
           type="button"
-          className="min-h-[44px] px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer shrink-0"
+          className="min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer shrink-0"
           onClick={(e) => {
             e.stopPropagation();
             onStudy(item.id);
@@ -782,13 +782,13 @@ export default function PlazaTab({ t, language, hidden = false }: PlazaTabProps)
         </div>
 
         {/* Sort Tabs & Search Controls */}
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between w-full md:w-auto">
           {/* Segmented Sort Tabs */}
           <div className="inline-flex bg-slate-100 dark:bg-slate-800/80 p-1 rounded-2xl border border-slate-200 dark:border-slate-700/60" role="tablist" aria-label="Sắp xếp bài tranh biện">
             <button
               type="button"
               role="tab"
-              className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 sort === 'latest'
                   ? 'bg-white dark:bg-indigo-600 text-slate-900 dark:text-white shadow-sm'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -801,7 +801,7 @@ export default function PlazaTab({ t, language, hidden = false }: PlazaTabProps)
             <button
               type="button"
               role="tab"
-              className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 sort === 'popular'
                   ? 'bg-white dark:bg-indigo-600 text-slate-900 dark:text-white shadow-sm'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -827,7 +827,7 @@ export default function PlazaTab({ t, language, hidden = false }: PlazaTabProps)
             {searchQuery && (
               <button
                 type="button"
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
                 onClick={() => {
                   setSearchQuery('');
                   void loadFeed(sort, '');

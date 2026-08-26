@@ -137,38 +137,40 @@ export async function generateOpponentResponse(
     targetArgument: input.targetArgument,
   });
 
-  // 2. Call LLM with telemetry metering.
-  //    IMPORTANT: NO response_format field → model returns free-form plain text.
-  const aiResult = await executeWithMetering({
-    userId: input.userId,
-    sessionId: input.sessionId,
-    turnNumber: input.turnNumber,
-    serviceType: 'LLM_OPPONENT',
-    modelName: opponentModel,
-    taskName: 'Opponent_Rebuttal',
-    apiCallFunction: async () => {
-      const completion = await createOpenAIChatCompletion({
-        model: opponentModel,
-        systemPrompt,
-        userPrompt,
-        temperature: 0.7,
-        max_tokens: OPPONENT_MAX_TOKENS,
-        // Explicitly omit response_format — opponent is plain text, not JSON.
-      });
+  // Helper for invoking LLM via metering wrapper
+  const executeCall = async (taskName: string, extraInstruction?: string) => {
+    return await executeWithMetering({
+      userId: input.userId,
+      sessionId: input.sessionId,
+      turnNumber: input.turnNumber,
+      serviceType: 'LLM_OPPONENT',
+      modelName: opponentModel,
+      taskName,
+      apiCallFunction: async () => {
+        const completion = await createOpenAIChatCompletion({
+          model: opponentModel,
+          systemPrompt: extraInstruction ? `${systemPrompt}\n\n${extraInstruction}` : systemPrompt,
+          userPrompt,
+          temperature: 0.7,
+          max_tokens: OPPONENT_MAX_TOKENS,
+        });
 
-      return {
-        content: completion.content,
-        usage: {
-          prompt_tokens: completion.usage.prompt_tokens,
-          completion_tokens: completion.usage.completion_tokens,
-        },
-        _gateway: completion._gateway,
-      };
-    },
-  });
+        return {
+          content: completion.content,
+          finish_reason: completion.finish_reason || 'stop',
+          usage: {
+            prompt_tokens: completion.usage.prompt_tokens,
+            completion_tokens: completion.usage.completion_tokens,
+          },
+          _gateway: completion._gateway,
+        };
+      },
+    });
+  };
 
-  // 3. Normalise raw text from LLM result.
-  const rawText = stripOpponentFences(
+  // 2. Call LLM (Attempt 1)
+  let aiResult = await executeCall('Opponent_Rebuttal');
+  let rawText = stripOpponentFences(
     typeof aiResult.content === 'string'
       ? aiResult.content
       : aiResult.content != null
@@ -176,21 +178,79 @@ export async function generateOpponentResponse(
       : '',
   );
 
-  // 4. Pre-safety diagnostic log — shows exactly what the model returned
-  //    BEFORE any filtering so we can identify false fallback triggers.
   console.info('[OPPONENT_RAW]', {
     sessionId: input.sessionId,
     turn: input.turnNumber,
     model: opponentModel,
+    finish_reason: aiResult.finish_reason,
     in_tokens: (aiResult as any).usage?.prompt_tokens ?? 0,
     out_tokens: (aiResult as any).usage?.completion_tokens ?? 0,
     raw_length: rawText.length,
     raw_preview: rawText.slice(0, 120),
   });
 
-  // 5. Post-generation safety filter (Spec 17 §10).
-  const safetyResult = validateOpponentResponse(rawText);
+  let safetyResult = validateOpponentResponse(rawText, aiResult.finish_reason);
 
+  // 3. Controlled Single Retry if response was truncated or empty
+  if (
+    !safetyResult.safe &&
+    (safetyResult.violation_type === 'TRUNCATED_RESPONSE' ||
+      safetyResult.violation_type === 'INCOMPLETE_SENTENCE' ||
+      safetyResult.violation_type === 'EMPTY_RESPONSE')
+  ) {
+    console.warn('[OPPONENT_RETRY_TRIGGERED]', {
+      sessionId: input.sessionId,
+      turn: input.turnNumber,
+      reason: safetyResult.violation_type,
+      finish_reason: aiResult.finish_reason,
+    });
+
+    try {
+      const retryResult = await executeCall(
+        'Opponent_Rebuttal_Retry',
+        'YÊU CẦU BẮT BUỘC: Hãy trình bày phản biện cô đọng, súc tích và HOÀN TẤT TRỌN VẸN toàn bộ câu, tuyệt đối không để câu bị ngắt quãng giữa chừng.',
+      );
+      const retryRawText = stripOpponentFences(
+        typeof retryResult.content === 'string'
+          ? retryResult.content
+          : retryResult.content != null
+          ? String(retryResult.content)
+          : '',
+      );
+
+      const retrySafety = validateOpponentResponse(retryRawText, retryResult.finish_reason);
+      if (retrySafety.safe) {
+        console.info('[OPPONENT_RETRY_SUCCESS]', {
+          sessionId: input.sessionId,
+          turn: input.turnNumber,
+          finish_reason: retryResult.finish_reason,
+          raw_length: retryRawText.length,
+        });
+        aiResult = retryResult;
+        rawText = retryRawText;
+        safetyResult = retrySafety;
+      } else {
+        console.error('[OPPONENT_RETRY_FAILED]', {
+          sessionId: input.sessionId,
+          turn: input.turnNumber,
+          violation_type: retrySafety.violation_type,
+          finish_reason: retryResult.finish_reason,
+        });
+        // Explicit failure: do NOT return partial text as success
+        const err = new Error(`OPPONENT_TRUNCATED: AI response truncated by provider (${retrySafety.violation_type}) after retry.`);
+        (err as any).code = 'OPPONENT_TRUNCATED';
+        throw err;
+      }
+    } catch (retryErr: any) {
+      if (retryErr?.code === 'OPPONENT_TRUNCATED') throw retryErr;
+      console.error('[OPPONENT_RETRY_ERROR]', retryErr?.message || retryErr);
+      const err = new Error(`OPPONENT_TRUNCATED: AI Opponent call failed during completion retry.`);
+      (err as any).code = 'OPPONENT_TRUNCATED';
+      throw err;
+    }
+  }
+
+  // 4. Handle remaining safety violations (Profanity / Personal Attack)
   if (!safetyResult.safe) {
     logSafetyViolation(
       input.sessionId,
@@ -198,8 +258,6 @@ export async function generateOpponentResponse(
       safetyResult.violation_type,
       rawText.length,
     );
-    // Log the specific violation type so we can tell if it's EMPTY_RESPONSE
-    // (model returned too-short text) vs PROFANITY / PERSONAL_ATTACK.
     console.warn('[OPPONENT_SAFETY_FILTERED]', {
       sessionId: input.sessionId,
       turn: input.turnNumber,

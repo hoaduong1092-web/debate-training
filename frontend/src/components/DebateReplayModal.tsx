@@ -172,11 +172,11 @@ export const DebateReplayModal: React.FC<Props> = ({ sessionId, onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-xl p-3 md:p-5 animate-fade-in cursor-default"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/80 backdrop-blur-xl p-3 md:p-5 animate-fade-in cursor-default"
       onClick={handleClose}
     >
       <div
-        className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-3xl max-w-6xl w-full max-h-[94vh] flex flex-col shadow-2xl overflow-hidden text-slate-900 dark:text-slate-100 transition-all"
+        className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-3xl max-w-6xl w-full max-h-[94dvh] flex flex-col shadow-2xl overflow-hidden text-slate-900 dark:text-slate-100 transition-all"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── HEADER ── */}
@@ -243,10 +243,12 @@ export const DebateReplayModal: React.FC<Props> = ({ sessionId, onClose }) => {
             <button
               type="button"
               onClick={handleClose}
-              className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition active:scale-95 shrink-0 cursor-pointer"
+              className="min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0 cursor-pointer"
               aria-label="Đóng"
             >
-              ✕
+              <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition active:scale-95">
+                ✕
+              </div>
             </button>
           </div>
         </div>
@@ -268,7 +270,7 @@ export const DebateReplayModal: React.FC<Props> = ({ sessionId, onClose }) => {
                     setSelectedRound(roundNum);
                   }
                 }}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`min-h-[44px] min-w-[44px] px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center ${
                   selectedRound === roundNum
                     ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 border border-indigo-400/40'
                     : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'

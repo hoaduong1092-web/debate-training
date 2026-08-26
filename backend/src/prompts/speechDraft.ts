@@ -53,7 +53,7 @@ CRITICAL OUTPUT RULES — READ CAREFULLY:
 4. JSON VALUES (the content) should be in ${contentLang}.
 
 LENGTH & BUDGET GUIDELINES:
-- "arguments": Exactly 2-3 focused arguments. Keep each field concise, crisp, and impactful (1-2 sentences for claim, 2-3 sentences for reasoning, 1 sentence for evidence_suggestion).
+- "arguments": Exactly 2-3 focused arguments (prefer standard 3 core arguments: Luận điểm 1, Luận điểm 2, Luận điểm 3). Keep each field concise, crisp, and impactful (1-2 sentences for claim, 2-3 sentences for reasoning, 1 sentence for evidence_suggestion).
 - "counterarguments": Exactly 1-2 major counterarguments with focused rebuttal strategy (1-2 sentences each).
 - "conclusion": 1-2 powerful, complete concluding sentences summarizing the entire message and call to action.
 - IMPORTANT: Ensure the conclusion sentence is FULLY AND COMPLETELY written out before closing the JSON object. Never stop mid-sentence.
@@ -78,7 +78,7 @@ EXACT SCHEMA — use these EXACT key names, no exceptions:
   "conclusion": "strong, complete closing statement"
 }
 
-Provide 2-3 "arguments" and 1-2 "counterarguments".
+Provide 2-3 focused "arguments" (prefer 3 core arguments) and 1-2 "counterarguments".
 YOUR ENTIRE RESPONSE MUST BE A SINGLE VALID JSON OBJECT.`;
 }
 

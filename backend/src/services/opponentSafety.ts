@@ -17,6 +17,8 @@ export type ViolationType =
   | 'PROFANITY'
   | 'PERSONAL_ATTACK'
   | 'EMPTY_RESPONSE'
+  | 'TRUNCATED_RESPONSE'
+  | 'INCOMPLETE_SENTENCE'
   | null;
 
 export interface SafetyResult {
@@ -100,21 +102,32 @@ function truncateToMaxWords(text: string, maxWords: number = 500): string {
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
- * Validate an AI Opponent response for safety.
+ * Validate an AI Opponent response for safety and completion integrity.
  *
- * Checks (in order per Spec 17 §10.2):
- * 1. Length — truncate if > 500 words (not a violation)
- * 2. Empty — response < 5 words → unsafe
- * 3. Profanity — Vietnamese profanity patterns → unsafe
- * 4. Personal attack — direct user attacks → unsafe
+ * Checks:
+ * 1. Provider metadata — finish_reason === 'length' → unsafe TRUNCATED_RESPONSE
+ * 2. Length — truncate if > 500 words (not a violation)
+ * 3. Empty — response < 5 words → unsafe EMPTY_RESPONSE
+ * 4. Profanity — Vietnamese profanity patterns → unsafe PROFANITY
+ * 5. Personal attack — direct user attacks → unsafe PERSONAL_ATTACK
+ * 6. Completion integrity — detect dangling conjunctions or abrupt endings → unsafe INCOMPLETE_SENTENCE
  *
  * Returns SafetyResult with the filtered text or fallback message.
  */
-export function validateOpponentResponse(text: string): SafetyResult {
-  // 1. Truncate overly long responses (not a violation).
+export function validateOpponentResponse(text: string, finishReason?: string): SafetyResult {
+  // 1. Provider metadata check (Primary Signal)
+  if (finishReason === 'length') {
+    return {
+      safe: false,
+      filtered_text: OPPONENT_FALLBACK_MESSAGE,
+      violation_type: 'TRUNCATED_RESPONSE',
+    };
+  }
+
+  // 2. Truncate overly long responses (not a violation).
   const trimmed = truncateToMaxWords(text);
 
-  // 2. Empty check.
+  // 3. Empty check.
   if (!trimmed || countWords(trimmed) < 5) {
     return {
       safe: false,
@@ -123,7 +136,7 @@ export function validateOpponentResponse(text: string): SafetyResult {
     };
   }
 
-  // 3. Profanity check.
+  // 4. Profanity check.
   if (containsProfanity(trimmed)) {
     return {
       safe: false,
@@ -132,12 +145,23 @@ export function validateOpponentResponse(text: string): SafetyResult {
     };
   }
 
-  // 4. Personal attack check.
+  // 5. Personal attack check.
   if (containsPersonalAttack(trimmed)) {
     return {
       safe: false,
       filtered_text: OPPONENT_FALLBACK_MESSAGE,
       violation_type: 'PERSONAL_ATTACK',
+    };
+  }
+
+  // 6. Completion integrity check (Secondary Guardrail)
+  // Detect if text ends with a dangling preposition/conjunction or trailing comma/hyphen
+  const danglingEndings = /(?:[,;\-—–]|\b(và|hoặc|nhưng|mà|tại|bởi|vì|rằng|là|như|với|của|trong|đang|đã|sẽ|do|nếu|thì|nên|tuy|dù))\s*$/ui;
+  if (danglingEndings.test(trimmed)) {
+    return {
+      safe: false,
+      filtered_text: OPPONENT_FALLBACK_MESSAGE,
+      violation_type: 'INCOMPLETE_SENTENCE',
     };
   }
 

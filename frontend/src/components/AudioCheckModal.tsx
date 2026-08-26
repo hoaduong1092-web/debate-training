@@ -219,7 +219,7 @@ export const AudioCheckModal: React.FC<AudioCheckModalProps> = ({ isOpen, onClos
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
             aria-label="Đóng"
           >
             <X className="w-4 h-4" />
@@ -289,7 +289,7 @@ export const AudioCheckModal: React.FC<AudioCheckModalProps> = ({ isOpen, onClos
               </div>
 
               {/* Multi-band Graphic Frequency Simulation */}
-              <div className="flex items-end justify-between h-8 gap-1 pt-2 px-1">
+              <div className="flex items-end justify-between h-8 gap-1 pt-2 px-1 w-full">
                 {Array.from({ length: 16 }).map((_, i) => {
                   // Simulate varied frequency wave heights based on master micVolume
                   const multiplier = Math.sin((i / 15) * Math.PI) + 0.3;
@@ -319,7 +319,7 @@ export const AudioCheckModal: React.FC<AudioCheckModalProps> = ({ isOpen, onClos
               <button
                 type="button"
                 onClick={isMicTesting ? cleanupMicTest : startMicTest}
-                className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 transition flex items-center gap-1.5 cursor-pointer"
+                className="min-h-[44px] px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 transition flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 {isMicTesting ? 'Tạm dừng' : 'Bật lại'}
               </button>
@@ -348,7 +348,7 @@ export const AudioCheckModal: React.FC<AudioCheckModalProps> = ({ isOpen, onClos
               type="button"
               onClick={testSpeaker}
               disabled={isSpeakerTesting}
-              className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-bold shadow-md shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 active:scale-98 disabled:opacity-75 cursor-pointer"
+              className="w-full min-h-[44px] py-2 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-bold shadow-md shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 active:scale-98 disabled:opacity-75 cursor-pointer"
             >
               {isSpeakerTesting ? (
                 <>
@@ -374,7 +374,7 @@ export const AudioCheckModal: React.FC<AudioCheckModalProps> = ({ isOpen, onClos
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition active:scale-95 cursor-pointer"
+            className="min-h-[44px] px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition active:scale-95 cursor-pointer"
           >
             Hoàn Tất & Đấu Ngay
           </button>

@@ -1056,7 +1056,7 @@ function SpeechDraftView({
                           disabled={i === 0}
                           onClick={() => handleMoveArg(i, 'up')}
                           title={isVi ? 'Chuyển lên' : 'Move up'}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                          className="min-h-[40px] min-w-[40px] flex items-center justify-center p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition"
                         >
                           <ArrowUp size={14} />
                         </button>
@@ -1065,7 +1065,7 @@ function SpeechDraftView({
                           disabled={i === workspaceArgs.length - 1}
                           onClick={() => handleMoveArg(i, 'down')}
                           title={isVi ? 'Chuyển xuống' : 'Move down'}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                          className="min-h-[40px] min-w-[40px] flex items-center justify-center p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition"
                         >
                           <ArrowDown size={14} />
                         </button>
@@ -1073,7 +1073,7 @@ function SpeechDraftView({
                           type="button"
                           onClick={() => handleDeleteArg(arg.argumentId)}
                           title={isVi ? 'Xóa luận điểm này' : 'Delete argument'}
-                          className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition ml-1"
+                          className="min-h-[40px] min-w-[40px] flex items-center justify-center p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition ml-1"
                         >
                           <Trash2 size={14} />
                         </button>
@@ -1133,7 +1133,7 @@ function SpeechDraftView({
                         type="button"
                         disabled={!!refinementLoading[arg.argumentId] || !arg.claim.trim()}
                         onClick={() => handleRefineArg(arg)}
-                        className="self-start px-3 py-1.5 bg-violet-50 dark:bg-violet-500/10 hover:bg-violet-100 dark:hover:bg-violet-500/20 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-500/30 text-xs font-bold rounded-xl transition flex items-center gap-1.5 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="self-start min-h-[44px] px-3 py-1.5 bg-violet-50 dark:bg-violet-500/10 hover:bg-violet-100 dark:hover:bg-violet-500/20 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-500/30 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         {refinementLoading[arg.argumentId] ? (
                           <>
@@ -1259,7 +1259,7 @@ function SpeechDraftView({
                           type="button"
                           disabled={i === 0}
                           onClick={() => handleMoveCounter(i, 'up')}
-                          className="p-1 text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30"
+                          className="min-h-[40px] min-w-[40px] flex items-center justify-center p-1 text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30 rounded-lg transition"
                         >
                           <ArrowUp size={13} />
                         </button>
@@ -1267,14 +1267,14 @@ function SpeechDraftView({
                           type="button"
                           disabled={i === workspaceCounters.length - 1}
                           onClick={() => handleMoveCounter(i, 'down')}
-                          className="p-1 text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30"
+                          className="min-h-[40px] min-w-[40px] flex items-center justify-center p-1 text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30 rounded-lg transition"
                         >
                           <ArrowDown size={13} />
                         </button>
                         <button
                           type="button"
                           onClick={() => handleDeleteCounter(ca.counterargumentId)}
-                          className="p-1 text-rose-500 hover:text-rose-700"
+                          className="min-h-[40px] min-w-[40px] flex items-center justify-center p-1 text-rose-500 hover:text-rose-700 rounded-lg transition"
                         >
                           <Trash2 size={13} />
                         </button>
@@ -1341,12 +1341,12 @@ function SpeechDraftView({
           )}
 
           {/* Actions Bar */}
-          <div className="flex flex-wrap items-center gap-3 pt-2">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 pt-2">
             <button
               type="button"
               disabled={!isWorkspaceValid}
               onClick={handleConfirmAndHandoff}
-              className={`px-5 py-3 text-white text-xs font-bold rounded-xl shadow-lg transition active:scale-95 flex items-center gap-2 ${
+              className={`w-full md:w-auto min-h-[44px] px-5 py-3 text-white text-xs font-bold rounded-xl shadow-lg transition active:scale-95 flex items-center justify-center gap-2 ${
                 isWorkspaceValid
                   ? 'shimmer-btn cursor-pointer'
                   : 'bg-slate-400 dark:bg-slate-700 opacity-60 cursor-not-allowed'
@@ -1357,7 +1357,7 @@ function SpeechDraftView({
             </button>
             <button
               type="button"
-              className="px-4 py-3 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 text-xs font-bold rounded-xl transition active:scale-95 flex items-center gap-2"
+              className="w-full md:w-auto min-h-[44px] px-4 py-3 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 text-xs font-bold rounded-xl transition active:scale-95 flex items-center justify-center gap-2"
               onClick={() => setResult(null)}
             >
               <RefreshCw size={14} />

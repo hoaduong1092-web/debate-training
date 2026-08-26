@@ -135,7 +135,7 @@ export const DebateInput: React.FC<DebateInputProps> = ({
       <div className="flex md:hidden flex-col gap-3 w-full">
         {/* Mobile Mode Switcher & Turn Indicator */}
         <div className="flex items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-2.5">
-          <div className="flex bg-slate-100 dark:bg-slate-950/80 p-1 rounded-xl border border-slate-200 dark:border-white/10 text-xs w-full sm:w-auto">
+          <div className="flex bg-slate-100 dark:bg-slate-950/80 p-1 rounded-xl border border-slate-200 dark:border-white/10 text-xs sm:text-sm w-full sm:w-auto">
             <button
               type="button"
               onClick={() => {
@@ -189,7 +189,7 @@ export const DebateInput: React.FC<DebateInputProps> = ({
               onFocus={handleMobileFocus}
               onChange={(e) => setInputText(e.target.value)}
               placeholder={isVi ? `Nhập luận cứ của bạn cho Lượt ${turns.length + 1} theo cấu trúc C-R-E (Claim, Reasoning, Evidence)...` : `State your argument for Turn ${turns.length + 1} following C-R-E (Claim, Reasoning, Evidence)...`}
-              className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl p-3.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 resize-none outline-none transition leading-relaxed overflow-y-auto"
+              className="w-full min-h-[72px] bg-slate-50 dark:bg-slate-950/80 border border-slate-300 dark:border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl p-3.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 resize-none outline-none transition leading-relaxed overflow-y-auto"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                   e.preventDefault();
@@ -203,7 +203,7 @@ export const DebateInput: React.FC<DebateInputProps> = ({
                 type="button"
                 onClick={() => onSendArgument()}
                 disabled={isLoading || !inputText.trim()}
-                className="min-h-[44px] px-5 py-2.5 shimmer-btn disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2 active:scale-95 cursor-pointer shadow-indigo-600/20"
+                className="min-h-[44px] min-w-[44px] px-5 py-2.5 shimmer-btn disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2 active:scale-95 cursor-pointer shadow-indigo-600/20"
                 aria-label={isVi ? `Gửi Luận Điểm Lượt ${turns.length + 1}` : `Submit Argument Turn ${turns.length + 1}`}
               >
                 <span>{isLoading ? (isVi ? 'Đang phân tích...' : 'Analyzing...') : (isVi ? `Gửi Luận Điểm (Lượt ${turns.length + 1})` : `Submit (Turn ${turns.length + 1})`)}</span>
@@ -236,14 +236,14 @@ export const DebateInput: React.FC<DebateInputProps> = ({
                   <button
                     type="button"
                     onClick={onOpenPricingModal}
-                    className="min-h-[44px] px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+                    className="min-h-[44px] w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
                   >
                     ⚡ {isVi ? 'Nạp Voice Boost (15k / 49k)' : 'Top Up Voice Boost'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setInputMode('text')}
-                    className="min-h-[44px] px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl transition cursor-pointer flex items-center justify-center"
+                    className="min-h-[44px] w-full sm:w-auto px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl transition cursor-pointer flex items-center justify-center"
                   >
                     {isVi ? 'Soạn Văn Bản' : 'Switch to Text'}
                   </button>

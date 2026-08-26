@@ -46,67 +46,108 @@ export const ArenaSetup: React.FC<ArenaSetupProps> = ({
       {/* Ambient Background Glow */}
       <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/15 px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-500/30 flex items-center gap-1.5 shadow-sm">
-          <svg width="14" height="14" className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0 inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
-          </svg>
-          <span>{isVi ? `Kiến Nghị Tranh Biện (${format})` : `DEBATE MOTION (${format})`}</span>
-        </span>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Nút Đổi Kiến Nghị / Mở Motion Hub */}
-          <button
-            type="button"
-            onClick={onOpenMotionModal}
-            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 border border-indigo-200 dark:border-indigo-500/30 transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
-            title={isVi ? 'Đổi chủ đề tranh biện hoặc chọn từ thư viện kiến nghị WSDC/BP/AP' : 'Change topic or pick from WSDC/BP/AP curated library'}
-          >
-            <svg width="14" height="14" className="w-3.5 h-3.5 inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-2 md:mb-2 md:flex-wrap">
+        {/* Tier 1 (Status): Format badge + Timer pill on mobile, left block on desktop */}
+        <div className="flex items-center justify-between w-full md:w-auto">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/15 px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-500/30 flex items-center gap-1.5 shadow-sm">
+            <svg width="14" height="14" className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0 inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
             </svg>
-            <span>{isVi ? '🎯 Đổi Kiến Nghị' : '🎯 Change Motion'}</span>
-          </button>
+            <span>{isVi ? `Kiến Nghị Tranh Biện (${format})` : `DEBATE MOTION (${format})`}</span>
+          </span>
 
-          {/* Nút Mở Trợ Lý AI Phân Tích */}
-          {onOpenAssistant && (
+          {/* Mobile Timer Pill */}
+          <div className="flex items-center gap-2 md:hidden">
             <button
               type="button"
-              onClick={() => onOpenAssistant(topic, stance)}
-              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-violet-50 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-500/25 border border-violet-200 dark:border-violet-500/30 transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
-              title={isVi ? 'Mở Trợ lý AI để phân tích đa chiều và gợi ý dàn ý cho kiến nghị này' : 'Open AI Assistant for motion analysis and speech drafting'}
+              onClick={() => setIsTimerRunning((r) => !r)}
+              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/80 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 transition flex items-center gap-1.5 cursor-pointer min-h-[44px]"
             >
-              <svg width="20" height="20" className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>
-              </svg>
-              <span>{isVi ? '🤖 Trợ Lý Phân Tích' : '🤖 AI Assistant'}</span>
+              {isTimerRunning ? (
+                <svg width="12" height="12" className="w-3 h-3 shrink-0 inline-block" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="4" width="4" height="16"/>
+                  <rect x="14" y="4" width="4" height="16"/>
+                </svg>
+              ) : (
+                <svg width="12" height="12" className="w-3 h-3 shrink-0 inline-block" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+              )}
+              <span className="hidden sm:inline">{isTimerRunning ? (isVi ? 'Dừng' : 'Pause') : (isVi ? 'Bấm Giờ' : 'Start Timer')}</span>
             </button>
-          )}
+            <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-950/70 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-white/5 flex items-center min-h-[44px]">
+              {formatTime(speechSeconds)}
+            </span>
+          </div>
+        </div>
 
-          <button
-            type="button"
-            onClick={() => setIsTimerRunning((r) => !r)}
-            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/80 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 transition flex items-center gap-1.5 cursor-pointer"
-          >
-            {isTimerRunning ? (
-              <svg width="12" height="12" className="w-3 h-3 shrink-0 inline-block" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="6" y="4" width="4" height="16"/>
-                <rect x="14" y="4" width="4" height="16"/>
+        {/* Tier 2 (Headline): Prominent motion title on mobile */}
+        <div className="md:hidden">
+          <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 leading-snug tracking-wide">
+            {topic}
+          </h2>
+        </div>
+
+        {/* Tier 3 (Actions): Grid on mobile, flows into right block on desktop */}
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 md:flex-wrap w-full md:w-auto">
+          <div className="grid grid-cols-2 gap-2 md:contents">
+            {/* Nút Đổi Kiến Nghị / Mở Motion Hub */}
+            <button
+              type="button"
+              onClick={onOpenMotionModal}
+              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 border border-indigo-200 dark:border-indigo-500/30 transition flex items-center justify-center md:justify-start gap-1.5 cursor-pointer shadow-sm active:scale-95 min-h-[44px] md:min-h-0"
+              title={isVi ? 'Đổi chủ đề tranh biện hoặc chọn từ thư viện kiến nghị WSDC/BP/AP' : 'Change topic or pick from WSDC/BP/AP curated library'}
+            >
+              <svg width="14" height="14" className="w-3.5 h-3.5 inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
               </svg>
-            ) : (
-              <svg width="12" height="12" className="w-3 h-3 shrink-0 inline-block" viewBox="0 0 24 24" fill="currentColor">
-                <polygon points="5 3 19 12 5 21 5 3"/>
-              </svg>
+              <span>{isVi ? 'Đổi Kiến Nghị' : 'Change Motion'}</span>
+            </button>
+
+            {/* Nút Mở Trợ Lý AI Phân Tích */}
+            {onOpenAssistant && (
+              <button
+                type="button"
+                onClick={() => onOpenAssistant(topic, stance)}
+                className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-violet-50 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-500/25 border border-violet-200 dark:border-violet-500/30 transition flex items-center justify-center md:justify-start gap-1.5 cursor-pointer shadow-sm active:scale-95 min-h-[44px] md:min-h-0"
+                title={isVi ? 'Mở Trợ lý AI để phân tích đa chiều và gợi ý dàn ý cho kiến nghị này' : 'Open AI Assistant for motion analysis and speech drafting'}
+              >
+                <svg width="20" height="20" className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>
+                </svg>
+                <span>{isVi ? 'Trợ Lý AI' : 'AI Assistant'}</span>
+              </button>
             )}
-            <span>{isTimerRunning ? (isVi ? 'Dừng' : 'Pause') : (isVi ? 'Bấm Giờ' : 'Start Timer')}</span>
-          </button>
-          <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-950/70 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-white/5">
-            {formatTime(speechSeconds)} / 8:00
-          </span>
+          </div>
+
+          {/* Desktop Timer Pill */}
+          <div className="hidden md:flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsTimerRunning((r) => !r)}
+              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/80 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 transition flex items-center gap-1.5 cursor-pointer"
+            >
+              {isTimerRunning ? (
+                <svg width="12" height="12" className="w-3 h-3 shrink-0 inline-block" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="4" width="4" height="16"/>
+                  <rect x="14" y="4" width="4" height="16"/>
+                </svg>
+              ) : (
+                <svg width="12" height="12" className="w-3 h-3 shrink-0 inline-block" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+              )}
+              <span>{isTimerRunning ? (isVi ? 'Dừng' : 'Pause') : (isVi ? 'Bấm Giờ' : 'Start Timer')}</span>
+            </button>
+            <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-950/70 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-white/5">
+              {formatTime(speechSeconds)} / 8:00
+            </span>
+          </div>
         </div>
       </div>
 
-      <div className="mt-2">
+      {/* Desktop Topic */}
+      <div className="hidden md:block mt-2">
         <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 leading-snug tracking-wide">
           {topic}
         </h2>

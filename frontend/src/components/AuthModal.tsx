@@ -157,7 +157,7 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fade-in">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-md w-full p-6 sm:p-8 shadow-2xl relative text-white">
+      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-md w-full p-5 sm:p-8 shadow-2xl relative text-white">
         {/* Close Button */}
         <button
           type="button"
@@ -245,7 +245,7 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose }) => {
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-3 text-center">
                 Nhập 6 Chữ Số OTP
               </label>
-              <div className="flex justify-center gap-2 sm:gap-3">
+              <div className="flex justify-center gap-1.5 sm:gap-2.5">
                 {otpInput.map((digit, idx) => (
                   <input
                     key={idx}
@@ -256,7 +256,7 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose }) => {
                     value={digit}
                     onChange={(e) => handleOtpChange(idx, e.target.value)}
                     onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                    className="w-11 h-12 sm:w-12 sm:h-14 text-center text-xl font-bold bg-slate-800 border border-slate-700 rounded-xl focus:border-indigo-500 focus:outline-none text-white transition"
+                    className="w-9 sm:w-11 h-11 sm:h-14 text-center text-lg sm:text-xl font-bold bg-slate-800 border border-slate-700 rounded-xl focus:border-indigo-500 focus:outline-none text-white transition"
                   />
                 ))}
               </div>

@@ -305,7 +305,7 @@ export function parseSpeechDraft(raw: string | unknown): SpeechDraftResult | nul
     'summary', 'ending', 'loi_ket_thuc',
   ], 'Để kết luận, chúng ta cần nhìn nhận vấn đề này một cách nghiêm túc và hành động kịp thời.');
 
-  // Counterarguments
+  // Counterarguments (preserved without injecting fabricated fake counterarguments)
   const rawCounters = pickArray(obj, [
     'counterarguments', 'counterArguments', 'counter_arguments',
     'phan_bien', 'cac_phan_bien', 'phan_luan', 'y_kien_phan_doi',
@@ -315,19 +315,10 @@ export function parseSpeechDraft(raw: string | unknown): SpeechDraftResult | nul
     .map(coerceSpeechCounterargument)
     .filter((c): c is SpeechCounterargument => c !== null);
 
-  const finalCounters: SpeechCounterargument[] = counterarguments.length > 0 ? counterarguments : [
-    {
-      opponentArgument: 'Có thể có lập luận phản đối từ phía đối phương.',
-      rebuttal: 'Tuy nhiên, bằng chứng và logic ủng hộ lập trường của chúng ta.',
-      opposing_point: 'Có thể có lập luận phản đối từ phía đối phương.',
-      rebuttal_strategy: 'Tuy nhiên, bằng chứng và logic ủng hộ lập trường của chúng ta.',
-    },
-  ];
-
   const result: SpeechDraftResult = {
     hook,
     arguments: args,
-    counterarguments: finalCounters,
+    counterarguments,
     conclusion,
   };
 
@@ -446,12 +437,7 @@ export function parseMotionAnalysis(raw: string | unknown): MotionAnalysisResult
     'stakeholders', 'cac_ben_lien_quan', 'cac_ben', 'parties', 'affected_parties',
     'ben_lien_quan',
   ]);
-  const stakeholders: StakeholderItem[] = rawStakeholders.length > 0
-    ? rawStakeholders.map(coerceStakeholder)
-    : [
-        { name: 'Các bên bị ảnh hưởng', interest: 'Quyền lợi và trách nhiệm', impact: 'Tác động trực tiếp' },
-        { name: 'Cơ quan quản lý', interest: 'Hiệu lực thực thi chính sách', impact: 'Giám sát và điều phối' },
-      ];
+  const stakeholders: StakeholderItem[] = rawStakeholders.map(coerceStakeholder);
 
   // Affirmative Cases (required >= 1)
   const rawAff = pickArray(obj, [
@@ -479,10 +465,7 @@ export function parseMotionAnalysis(raw: string | unknown): MotionAnalysisResult
   const rawBurdens = pickArray(obj, [
     'burdenOfProof', 'burden_of_proof', 'burden', 'ganh_nang_chung_minh', 'burdens',
   ]);
-  const burdenOfProof = toStringArray(rawBurdens, [
-    'Phe Ủng hộ cần chứng minh tính cấp thiết và hiệu quả của giải pháp.',
-    'Phe Phản đối cần chứng minh những tác hại không thể khắc phục hoặc giải pháp thay thế tốt hơn.',
-  ]);
+  const burdenOfProof = toStringArray(rawBurdens);
 
   // Rebuttal vectors
   const rawVectors = pickArray(obj, [
@@ -490,10 +473,7 @@ export function parseMotionAnalysis(raw: string | unknown): MotionAnalysisResult
     'huong_phan_bien', 'diem_doi_dau', 'key_clashes', 'keyClashes',
     'cac_diem_tranh_luan',
   ]);
-  const rebuttalVectors = toStringArray(rawVectors, [
-    'Tính khả thi và thực tế khi áp dụng giải pháp vào đời sống.',
-    'Sự đánh đổi giữa lợi ích kinh tế/xã hội và quyền tự do/an toàn cá nhân.',
-  ]);
+  const rebuttalVectors = toStringArray(rawVectors);
 
   return {
     motion_title: motion_title || undefined,

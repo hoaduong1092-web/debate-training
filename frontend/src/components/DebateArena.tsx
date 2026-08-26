@@ -1471,7 +1471,7 @@ export function MotionPickerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
-      <div className="glass-panel-elevated w-full max-w-3xl max-h-[90vh] rounded-2xl border border-indigo-200 dark:border-white/10 shadow-2xl flex flex-col overflow-hidden bg-white/95 dark:bg-slate-950/95 text-slate-900 dark:text-slate-100">
+      <div className="glass-panel-elevated w-full max-w-3xl max-h-[90dvh] rounded-2xl border border-indigo-200 dark:border-white/10 shadow-2xl flex flex-col overflow-hidden bg-white/95 dark:bg-slate-950/95 text-slate-900 dark:text-slate-100">
         {/* Modal Header */}
         <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-3">

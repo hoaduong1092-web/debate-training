@@ -365,9 +365,9 @@ section('TC-TEXT-06 — Prompt Token Discipline (compact prompt = room for outpu
   });
   const sysWords = systemPrompt.split(/\s+/).length;
   const userWords = userPrompt.split(/\s+/).length;
-  // System prompt must be compact (room for 1500 token output).
-  assert('systemPrompt word count <200 (compact)', sysWords < 200);
-  assert('combined words <300', (sysWords + userWords) < 300);
+  // System prompt must be compact with rubric (room for 1500 token output).
+  assert('systemPrompt word count <500 (compact with rubric)', sysWords < 500);
+  assert('combined words <650', (sysWords + userWords) < 650);
 }
 
 // ─── TC-TEXT-07: Opponent Safety Filter & Vietnamese Unicode Boundary ───────────

@@ -616,32 +616,36 @@ export async function handleDebateMessage(req: Request, res: Response) {
     const opponentSuccess = opponentSettled.status === 'fulfilled';
     const coachSuccess = coachSettled.status === 'fulfilled';
 
-    if (!opponentSuccess && !coachSuccess) {
-      console.error('[BOTH_FAIL] Opponent:', (opponentSettled as PromiseRejectedResult).reason);
-      console.error('[BOTH_FAIL] Coach:', (coachSettled as PromiseRejectedResult).reason);
-      await prisma.debateTranscript.delete({ where: { id: userTranscript.id } });
+    // If opponent failed (or truncated after retry), do NOT save broken AI transcript or fake success
+    if (!opponentSuccess) {
+      const oppReason = (opponentSettled as PromiseRejectedResult).reason;
+      console.error('[OPPONENT_FAIL]', oppReason);
+      if (coachSettled.status === 'rejected') {
+        console.error('[COACH_FAIL]', (coachSettled as PromiseRejectedResult).reason);
+      }
+      try {
+        await prisma.debateTranscript.delete({ where: { id: userTranscript.id } });
+      } catch (delErr) {
+        console.warn('[ROLLBACK_USER_TRANSCRIPT_FAIL]', delErr);
+      }
+
+      const isTruncated = oppReason?.code === 'OPPONENT_TRUNCATED' || String(oppReason?.message || oppReason).includes('OPPONENT_TRUNCATED');
       return res.status(502).json({
         success: false,
-        error: 'AI_SERVICE_UNAVAILABLE',
-        message: 'Hệ thống AI đang gặp sự cố tạm thời. Vui lòng thử lại sau.',
+        error: isTruncated ? 'OPPONENT_TRUNCATED' : 'AI_SERVICE_UNAVAILABLE',
+        message: isTruncated
+          ? 'AI Opponent bị ngắt quãng giữa chừng và không hoàn tất câu. Vui lòng thử gửi lại.'
+          : 'Hệ thống AI đối thủ đang gặp sự cố tạm thời. Vui lòng thử lại sau.',
         retry: true,
       });
     }
 
-    let opponentResult: OpponentResult | null = null;
-    let opponentText = OPPONENT_FALLBACK_MESSAGE;
-    let opponentTelemetry = { tokens: { prompt_tokens: 0, completion_tokens: 0 }, execution_ms: 0 };
-
-    if (opponentSuccess) {
-      opponentResult = (opponentSettled as PromiseFulfilledResult<OpponentResult>).value;
-      opponentText = opponentResult.text;
-      opponentTelemetry = {
-        tokens: opponentResult.usage,
-        execution_ms: opponentResult.execution_ms,
-      };
-    } else {
-      console.error('[OPPONENT_FAIL]', (opponentSettled as PromiseRejectedResult).reason);
-    }
+    const opponentResult = (opponentSettled as PromiseFulfilledResult<OpponentResult>).value;
+    const opponentText = opponentResult.text;
+    const opponentTelemetry = {
+      tokens: opponentResult.usage,
+      execution_ms: opponentResult.execution_ms,
+    };
 
     let coachFeedback: any = null;
     let coachTelemetry = { tokens: { prompt_tokens: 0, completion_tokens: 0 }, execution_ms: 0 };
@@ -779,9 +783,6 @@ export async function handleDebateMessage(req: Request, res: Response) {
               } catch {}
             }
           }
-        }
-        if (!found && typeof ut.evidenceStar === 'number' && ut.evidenceStar > 0) {
-          scores.push(Math.min(10, Math.max(1, ut.evidenceStar * 2)));
         }
       }
       const runningScore = scores.length > 0
@@ -929,9 +930,6 @@ export async function listUserSessions(req: Request, res: Response): Promise<voi
                 } catch {}
               }
             }
-          }
-          if (!found && typeof ut.evidenceStar === 'number' && ut.evidenceStar > 0) {
-            scores.push(Math.min(10, Math.max(1, ut.evidenceStar * 2)));
           }
         }
         scoreNum = scores.length > 0

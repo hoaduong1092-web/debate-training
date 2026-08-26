@@ -980,124 +980,241 @@ export default function ProfileTab({
             </p>
           </div>
         ) : (
-          <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-slate-500 font-semibold">
-                    {isSelectMode && (
-                      <th className="py-3 px-3 w-10 text-center">
-                        <button
-                          type="button"
-                          onClick={handleToggleSelectAll}
-                          className="text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer flex items-center justify-center mx-auto"
-                          title={isAllSelected ? t.ordersDeselectAll : t.ordersSelectAll}
-                        >
-                          {isAllSelected ? (
-                            <CheckSquare size={16} className="text-indigo-600 dark:text-indigo-400" />
-                          ) : (
-                            <Square size={16} />
-                          )}
-                        </button>
-                      </th>
+          <div className="space-y-4">
+            {/* Mobile Presentation */}
+            <div className="md:hidden space-y-3">
+              {isSelectMode && (
+                <div className="flex items-center p-3 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm cursor-pointer" onClick={handleToggleSelectAll}>
+                  <button
+                    type="button"
+                    className="mr-3 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer flex items-center justify-center min-h-[44px] min-w-[44px]"
+                    title={isAllSelected ? t.ordersDeselectAll : t.ordersSelectAll}
+                  >
+                    {isAllSelected ? (
+                      <CheckSquare size={16} className="text-indigo-600 dark:text-indigo-400" />
+                    ) : (
+                      <Square size={16} />
                     )}
-                    <th className="py-3 px-4">{language === 'vi' ? 'Mã Đơn' : 'Order Code'}</th>
-                    <th className="py-3 px-4">{language === 'vi' ? 'Mặt Hàng' : 'Item'}</th>
-                    <th className="py-3 px-4">{language === 'vi' ? 'Số Tiền' : 'Amount'}</th>
-                    <th className="py-3 px-4">{language === 'vi' ? 'Cổng TT' : 'Gateway'}</th>
-                    <th className="py-3 px-4">{language === 'vi' ? 'Trạng Thái' : 'Status'}</th>
-                    <th className="py-3 px-4">{language === 'vi' ? 'Thời Gian' : 'Date'}</th>
-                    <th className="py-3 px-4 text-right">{language === 'vi' ? 'Thao Tác' : 'Action'}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
-                  {orders.map((ord) => {
-                    const isPaid = ord.status === 'PAID';
-                    const isPending = ord.status === 'PENDING';
-                    const isFailed = ord.status === 'FAILED';
-                    const isSelected = selectedOrderIds.has(ord.id);
+                  </button>
+                  <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                    {isAllSelected ? t.ordersDeselectAll : t.ordersSelectAll}
+                  </span>
+                </div>
+              )}
 
-                    const statusBadge = isPaid
-                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
-                      : isPending
-                      ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
-                      : isFailed
-                      ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30'
-                      : 'bg-slate-500/10 text-slate-500 border-slate-500/30';
+              {orders.map((ord) => {
+                const isPaid = ord.status === 'PAID';
+                const isPending = ord.status === 'PENDING';
+                const isFailed = ord.status === 'FAILED';
+                const isSelected = selectedOrderIds.has(ord.id);
 
-                    const statusText = isPaid
-                      ? (language === 'vi' ? '✓ Đã thanh toán' : '✓ Paid')
-                      : isPending
-                      ? (language === 'vi' ? '⏳ Chờ thanh toán' : '⏳ Pending')
-                      : isFailed
-                      ? (language === 'vi' ? '✕ Thất bại' : '✕ Failed')
-                      : ord.status;
+                const statusBadge = isPaid
+                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                  : isPending
+                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
+                  : isFailed
+                  ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30'
+                  : 'bg-slate-500/10 text-slate-500 border-slate-500/30';
 
-                    return (
-                      <tr
-                        key={ord.id}
-                        onClick={isSelectMode ? (e) => handleToggleSelectOrder(ord.id, e) : undefined}
-                        className={`transition ${
-                          isSelected
-                            ? 'bg-indigo-50/60 dark:bg-indigo-950/30'
-                            : 'hover:bg-slate-50/50 dark:hover:bg-slate-800/40'
-                        } ${isSelectMode ? 'cursor-pointer' : ''}`}
-                      >
+                const statusText = isPaid
+                  ? (language === 'vi' ? '✓ Đã thanh toán' : '✓ Paid')
+                  : isPending
+                  ? (language === 'vi' ? '⏳ Chờ thanh toán' : '⏳ Pending')
+                  : isFailed
+                  ? (language === 'vi' ? '✕ Thất bại' : '✕ Failed')
+                  : ord.status;
+
+                return (
+                  <div
+                    key={ord.id}
+                    onClick={isSelectMode ? (e) => handleToggleSelectOrder(ord.id, e) : undefined}
+                    className={`p-4 rounded-xl bg-white dark:bg-slate-900/90 border shadow-sm transition ${
+                      isSelected
+                        ? 'border-indigo-500/50 ring-2 ring-indigo-500/50 bg-indigo-50/50 dark:bg-indigo-950/30'
+                        : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                    } ${isSelectMode ? 'cursor-pointer' : ''}`}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
                         {isSelectMode && (
-                          <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              type="button"
-                              onClick={(e) => handleToggleSelectOrder(ord.id, e)}
-                              className="text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer flex items-center justify-center mx-auto"
-                            >
-                              {isSelected ? (
-                                <CheckSquare size={16} className="text-indigo-600 dark:text-indigo-400" />
-                              ) : (
-                                <Square size={16} />
-                              )}
-                            </button>
-                          </td>
-                        )}
-                        <td className="py-3 px-4 font-bold text-slate-800 dark:text-slate-200">
-                          {ord.orderCode}
-                        </td>
-                        <td className="py-3 px-4 font-sans font-medium text-slate-900 dark:text-white">
-                          <div className="flex items-center gap-1.5">
-                            {ord.itemType === 'VIP' && <span className="text-amber-500">👑</span>}
-                            {ord.itemType === 'CREDIT_PACK' && <span className="text-indigo-500">⚡</span>}
-                            {ord.itemType === 'PLAN' && <span className="text-blue-500">💎</span>}
-                            <span>{ord.itemName}</span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 font-bold text-indigo-600 dark:text-indigo-400">
-                          {Number(ord.amountVnd).toLocaleString('vi-VN')} đ
-                        </td>
-                        <td className="py-3 px-4 text-slate-600 dark:text-slate-400 font-sans">
-                          {ord.provider}
-                        </td>
-                        <td className="py-3 px-4 font-sans">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${statusBadge}`}>
-                            {statusText}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-slate-500 text-[11px] font-sans">
-                          {formatDate(ord.createdAt, language)}
-                        </td>
-                        <td className="py-3 px-4 text-right font-sans" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
-                            onClick={(e) => handleSingleDeleteClick(ord, e)}
-                            title={t.ordersDeleteSingle}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleSelectOrder(ord.id, e);
+                            }}
+                            className="text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer flex items-center justify-center min-h-[44px] min-w-[44px] -ml-3 -my-3"
                           >
-                            <Trash2 size={14} />
+                            {isSelected ? (
+                              <CheckSquare size={16} className="text-indigo-600 dark:text-indigo-400" />
+                            ) : (
+                              <Square size={16} />
+                            )}
                           </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                        )}
+                        <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                          {ord.orderCode}
+                        </span>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${statusBadge}`}>
+                        {statusText}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 mb-3 font-sans font-medium text-slate-900 dark:text-white">
+                      {ord.itemType === 'VIP' && <span className="text-amber-500">👑</span>}
+                      {ord.itemType === 'CREDIT_PACK' && <span className="text-indigo-500">⚡</span>}
+                      {ord.itemType === 'PLAN' && <span className="text-blue-500">💎</span>}
+                      <span>{ord.itemName}</span>
+                      <span className="text-xs text-slate-500 ml-auto">{ord.provider}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between mt-1 pt-3 border-t border-slate-100 dark:border-slate-800/60">
+                      <div>
+                        <div className="font-bold text-indigo-600 dark:text-indigo-400">
+                          {Number(ord.amountVnd).toLocaleString('vi-VN')} đ
+                        </div>
+                        <div className="text-slate-500 text-[11px] font-sans mt-0.5">
+                          {formatDate(ord.createdAt, language)}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSingleDeleteClick(ord, e);
+                        }}
+                        title={t.ordersDeleteSingle}
+                        className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop Presentation */}
+            <div className="hidden md:block bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-slate-500 font-semibold">
+                      {isSelectMode && (
+                        <th className="py-3 px-3 w-10 text-center">
+                          <button
+                            type="button"
+                            onClick={handleToggleSelectAll}
+                            className="text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer flex items-center justify-center mx-auto"
+                            title={isAllSelected ? t.ordersDeselectAll : t.ordersSelectAll}
+                          >
+                            {isAllSelected ? (
+                              <CheckSquare size={16} className="text-indigo-600 dark:text-indigo-400" />
+                            ) : (
+                              <Square size={16} />
+                            )}
+                          </button>
+                        </th>
+                      )}
+                      <th className="py-3 px-4">{language === 'vi' ? 'Mã Đơn' : 'Order Code'}</th>
+                      <th className="py-3 px-4">{language === 'vi' ? 'Mặt Hàng' : 'Item'}</th>
+                      <th className="py-3 px-4">{language === 'vi' ? 'Số Tiền' : 'Amount'}</th>
+                      <th className="py-3 px-4">{language === 'vi' ? 'Cổng TT' : 'Gateway'}</th>
+                      <th className="py-3 px-4">{language === 'vi' ? 'Trạng Thái' : 'Status'}</th>
+                      <th className="py-3 px-4">{language === 'vi' ? 'Thời Gian' : 'Date'}</th>
+                      <th className="py-3 px-4 text-right">{language === 'vi' ? 'Thao Tác' : 'Action'}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
+                    {orders.map((ord) => {
+                      const isPaid = ord.status === 'PAID';
+                      const isPending = ord.status === 'PENDING';
+                      const isFailed = ord.status === 'FAILED';
+                      const isSelected = selectedOrderIds.has(ord.id);
+
+                      const statusBadge = isPaid
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                        : isPending
+                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
+                        : isFailed
+                        ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30'
+                        : 'bg-slate-500/10 text-slate-500 border-slate-500/30';
+
+                      const statusText = isPaid
+                        ? (language === 'vi' ? '✓ Đã thanh toán' : '✓ Paid')
+                        : isPending
+                        ? (language === 'vi' ? '⏳ Chờ thanh toán' : '⏳ Pending')
+                        : isFailed
+                        ? (language === 'vi' ? '✕ Thất bại' : '✕ Failed')
+                        : ord.status;
+
+                      return (
+                        <tr
+                          key={ord.id}
+                          onClick={isSelectMode ? (e) => handleToggleSelectOrder(ord.id, e) : undefined}
+                          className={`transition ${
+                            isSelected
+                              ? 'bg-indigo-50/60 dark:bg-indigo-950/30'
+                              : 'hover:bg-slate-50/50 dark:hover:bg-slate-800/40'
+                          } ${isSelectMode ? 'cursor-pointer' : ''}`}
+                        >
+                          {isSelectMode && (
+                            <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                onClick={(e) => handleToggleSelectOrder(ord.id, e)}
+                                className="text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer flex items-center justify-center mx-auto"
+                              >
+                                {isSelected ? (
+                                  <CheckSquare size={16} className="text-indigo-600 dark:text-indigo-400" />
+                                ) : (
+                                  <Square size={16} />
+                                )}
+                              </button>
+                            </td>
+                          )}
+                          <td className="py-3 px-4 font-bold text-slate-800 dark:text-slate-200">
+                            {ord.orderCode}
+                          </td>
+                          <td className="py-3 px-4 font-sans font-medium text-slate-900 dark:text-white">
+                            <div className="flex items-center gap-1.5">
+                              {ord.itemType === 'VIP' && <span className="text-amber-500">👑</span>}
+                              {ord.itemType === 'CREDIT_PACK' && <span className="text-indigo-500">⚡</span>}
+                              {ord.itemType === 'PLAN' && <span className="text-blue-500">💎</span>}
+                              <span>{ord.itemName}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 font-bold text-indigo-600 dark:text-indigo-400">
+                            {Number(ord.amountVnd).toLocaleString('vi-VN')} đ
+                          </td>
+                          <td className="py-3 px-4 text-slate-600 dark:text-slate-400 font-sans">
+                            {ord.provider}
+                          </td>
+                          <td className="py-3 px-4 font-sans">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${statusBadge}`}>
+                              {statusText}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-slate-500 text-[11px] font-sans">
+                            {formatDate(ord.createdAt, language)}
+                          </td>
+                          <td className="py-3 px-4 text-right font-sans" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={(e) => handleSingleDeleteClick(ord, e)}
+                              title={t.ordersDeleteSingle}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}

@@ -145,9 +145,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = window.location.host;
-    const wsUrl = `${protocol}//${host}/ws?token=${encodeURIComponent(token)}&sessionId=${encodeURIComponent(sessionId)}`;
+    // Vercel does NOT proxy WebSocket connections — /ws hits the SPA fallback
+    // and returns index.html instead of upgrading the connection.
+    // Connect directly to the Railway backend for WebSocket.
+    const WS_BACKEND = import.meta.env.VITE_WS_BACKEND_URL
+      || 'wss://debate-training-production.up.railway.app';
+    const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const wsBase = isLocalDev
+      ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`
+      : WS_BACKEND;
+    const wsUrl = `${wsBase}/ws?token=${encodeURIComponent(token)}&sessionId=${encodeURIComponent(sessionId)}`;
 
     let ws: WebSocket | null = null;
     try {
