@@ -362,17 +362,57 @@ export async function createOpenAIChatCompletion(
     }
   }
 
-  // If retries failed on retryable or 404 error, attempt failover to configured fallback model
-  const fallbackModel = getFallbackModel();
-  if (!isFallbackAttempt && fallbackModel && fallbackModel !== model) {
-    console.warn(`[AI_FALLBACK_TRIGGERED] Primary model "${model}" failed (status=${lastStatus}). Failing over to "${fallbackModel}"...`);
-    return await createOpenAIChatCompletion(
-      {
-        ...request,
-        model: fallbackModel,
-      },
-      true,
-    );
+  // If retries failed on retryable or 404/429 error, attempt failover to Groq provider
+  const GROQ_FALLBACK_KEY = process.env.WHISPER_API_KEY || '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';
+  const GROQ_FALLBACK_BASE_URL = 'https://api.groq.com/openai/v1';
+  const GROQ_FALLBACK_MODEL = 'qwen/qwen3.8-27b';
+
+  if (!isFallbackAttempt) {
+    console.warn(`[AI_FALLBACK_TRIGGERED] Primary Gemini provider failed (status=${lastStatus}). Failing over to Groq (${GROQ_FALLBACK_MODEL})...`);
+    try {
+      const groqEndpoint = `${GROQ_FALLBACK_BASE_URL}/chat/completions`;
+      const groqHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GROQ_FALLBACK_KEY}`,
+      };
+      const groqPayload: Record<string, unknown> = {
+        model: GROQ_FALLBACK_MODEL,
+        messages: [
+          { role: 'system', content: request.systemPrompt },
+          { role: 'user', content: request.userPrompt },
+        ],
+        temperature: request.temperature ?? 0.7,
+        max_tokens: request.max_tokens ?? 3000,
+      };
+      if (request.response_format) {
+        groqPayload.response_format = request.response_format;
+      }
+      const groqRes = await executeSingleChatCompletion(groqEndpoint, groqHeaders, groqPayload, LLM_TIMEOUT_MS);
+      if (groqRes.ok && groqRes.payload) {
+        const payload = groqRes.payload;
+        const firstChoice = payload.choices?.[0] as any;
+        const rawContent = firstChoice?.message?.content;
+        let content = typeof rawContent === 'string' ? rawContent : rawContent != null ? String(rawContent) : '';
+        if (content.includes('</thought>')) {
+          content = content.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
+        }
+        if (content.includes('</think>')) {
+          content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+        }
+        const usage = payload.usage ?? {};
+        return {
+          content,
+          finish_reason: typeof firstChoice?.finish_reason === 'string' ? firstChoice.finish_reason : 'stop',
+          usage: {
+            prompt_tokens: typeof usage.prompt_tokens === 'number' ? usage.prompt_tokens : 0,
+            completion_tokens: typeof usage.completion_tokens === 'number' ? usage.completion_tokens : 0,
+          },
+          _gateway: 'groq-fallback',
+        };
+      }
+    } catch (groqErr) {
+      console.error('[AI_GROQ_FALLBACK_FAILED]', groqErr);
+    }
   }
 
   if (lastError?.name === 'AbortError') {
