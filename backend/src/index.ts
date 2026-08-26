@@ -25,6 +25,40 @@ const VOICE_WS_PORT = parseInt(String(process.env.VOICE_WS_PORT ?? '4001'), 10);
 app.use(cors());
 app.use(express.json());
 
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', time: new Date().toISOString() });
+});
+
+app.get('/api/v1/debug/ai-diag', async (req, res) => {
+  try {
+    const { getOpenAIApiKey, getOpenAIBaseUrl, getOpenAIModel, createOpenAIChatCompletion } = await import('./services/openAICompatibleClient');
+    const key = getOpenAIApiKey();
+    const url = getOpenAIBaseUrl();
+    const model = getOpenAIModel();
+    const start = Date.now();
+    const completion = await createOpenAIChatCompletion({
+      model,
+      systemPrompt: 'diagnostic test',
+      userPrompt: 'say ping',
+      max_tokens: 10,
+    });
+    res.json({
+      success: true,
+      durationMs: Date.now() - start,
+      baseUrl: url,
+      model,
+      keyPrefix: key.slice(0, 6) + '...' + key.slice(-4),
+      response: completion.content,
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      error: err.message || String(err),
+      stack: err.stack,
+    });
+  }
+});
+
 // Serve local media & generated TTS audio files
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
