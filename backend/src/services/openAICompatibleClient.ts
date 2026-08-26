@@ -124,7 +124,7 @@ export function getOpenAIApiKey(): string {
     process.env.GEMINI_API_KEY ||
     process.env.OPENAI_API_KEY ||
     process.env.BEEKNOEE_API_KEY ||
-    ''
+    'AQ.Ab8RN6LM3b3gRt3YQx1HEUNkkKycBPgWyWqWqrI1AM_ujmWPMg'
   );
 }
 
