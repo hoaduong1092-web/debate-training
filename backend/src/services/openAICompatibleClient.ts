@@ -72,15 +72,12 @@ interface OpenAIApiResponse {
 
 /**
  * Resolved base URL.
- * Priority: GEMINI_BASE_URL → OPENAI_BASE_URL → BEEKNOEE_BASE_URL → Gemini default.
+ * Priority: GEMINI_BASE_URL → OPENAI_BASE_URL → Gemini default.
  */
 export function getOpenAIBaseUrl(): string {
-  return (
-    process.env.GEMINI_BASE_URL ||
-    process.env.OPENAI_BASE_URL ||
-    process.env.BEEKNOEE_BASE_URL ||
-    'https://generativelanguage.googleapis.com/v1beta/openai'
-  );
+  const url = process.env.GEMINI_BASE_URL || process.env.OPENAI_BASE_URL;
+  if (url && !url.includes('beeknoee')) return url;
+  return 'https://generativelanguage.googleapis.com/v1beta/openai';
 }
 
 /**
@@ -117,15 +114,12 @@ export function getFallbackModel(): string {
 
 /**
  * Resolved API key.
- * Priority: GEMINI_API_KEY → OPENAI_API_KEY → BEEKNOEE_API_KEY → empty string.
+ * Priority: GEMINI_API_KEY → OPENAI_API_KEY → default production key.
  */
 export function getOpenAIApiKey(): string {
-  return (
-    process.env.GEMINI_API_KEY ||
-    process.env.OPENAI_API_KEY ||
-    process.env.BEEKNOEE_API_KEY ||
-    'AQ.Ab8RN6LM3b3gRt3YQx1HEUNkkKycBPgWyWqWqrI1AM_ujmWPMg'
-  );
+  const key = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY;
+  if (key && !key.includes('beeknoee') && key.length > 20) return key;
+  return 'AQ.Ab8RN6LM3b3gRt3YQx1HEUNkkKycBPgWyWqWqrI1AM_ujmWPMg';
 }
 
 /**
@@ -134,7 +128,6 @@ export function getOpenAIApiKey(): string {
 export function getGatewayName(): string {
   const url = getOpenAIBaseUrl();
   if (url.includes('googleapis.com')) return 'gemini';
-  if (url.includes('beeknoee')) return 'beeknoee';
   if (url.includes('groq')) return 'groq';
   return 'openai-compatible';
 }
@@ -275,7 +268,8 @@ export async function createOpenAIChatCompletion(
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${apiKey}`,
+    'Authorization': `Bearer ${apiKey}`,
+    'x-goog-api-key': apiKey,
   };
 
   // OpenRouter-only attribution headers.
