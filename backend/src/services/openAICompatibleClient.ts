@@ -70,14 +70,17 @@ interface OpenAIApiResponse {
 
 // ─── Configuration Resolvers ─────────────────────────────────────────────────
 
+const CANONICAL_GEMINI_KEY = 'AQ.Ab8RN6LM3b3gRt3YQx1HEUNkkKycBPgWyWqWqrI1AM_ujmWPMg';
+const CANONICAL_GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai';
+
 /**
  * Resolved base URL.
- * Priority: GEMINI_BASE_URL → OPENAI_BASE_URL → Gemini default.
+ * Strictly targets Google Gemini Generative Language OpenAI endpoint.
  */
 export function getOpenAIBaseUrl(): string {
-  const url = process.env.GEMINI_BASE_URL || process.env.OPENAI_BASE_URL;
-  if (url && !url.includes('beeknoee')) return url;
-  return 'https://generativelanguage.googleapis.com/v1beta/openai';
+  const url = process.env.GEMINI_BASE_URL;
+  if (url && url.includes('googleapis.com')) return url;
+  return CANONICAL_GEMINI_BASE_URL;
 }
 
 /**
@@ -114,12 +117,16 @@ export function getFallbackModel(): string {
 
 /**
  * Resolved API key.
- * Priority: GEMINI_API_KEY → OPENAI_API_KEY → default production key.
+ * Strictly validates Gemini key and rejects stale Groq/Beeknoee keys.
  */
 export function getOpenAIApiKey(): string {
-  const key = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY;
-  if (key && !key.includes('beeknoee') && key.length > 20) return key;
-  return 'AQ.Ab8RN6LM3b3gRt3YQx1HEUNkkKycBPgWyWqWqrI1AM_ujmWPMg';
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (geminiKey && geminiKey.startsWith('AQ.')) return geminiKey;
+
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (openaiKey && openaiKey.startsWith('AQ.')) return openaiKey;
+
+  return CANONICAL_GEMINI_KEY;
 }
 
 /**
