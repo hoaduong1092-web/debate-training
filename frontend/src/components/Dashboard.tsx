@@ -100,7 +100,7 @@ export const Dashboard: React.FC = () => {
             </div>
 
             {/* Navigation Tabs */}
-            <div className="hidden md:flex items-center bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold">
+            <div className="hidden lg:flex items-center bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold">
               <button
                 type="button"
                 onClick={() => setActiveTab('arena')}
@@ -268,7 +268,6 @@ export const Dashboard: React.FC = () => {
               setArenaPrefilledTopic('');
               setArenaPrefilledStance(undefined);
               setArenaPrefilledDraft('');
-              setArenaFinalDraft(null);
             }}
             language={language}
             t={t}
@@ -303,7 +302,7 @@ export const Dashboard: React.FC = () => {
       </main>
 
       {/* ── MOBILE BOTTOM NAVIGATION BAR ── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-950/95 backdrop-blur-2xl border-t border-slate-200 dark:border-slate-800/80 px-1.5 py-1 pb-[max(0.4rem,env(safe-area-inset-bottom,0px))] flex items-center justify-around shadow-[0_-4px_20px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_25px_rgba(0,0,0,0.5)]">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-950/95 backdrop-blur-2xl border-t border-slate-200 dark:border-slate-800/80 px-1.5 py-1 pb-[max(0.4rem,env(safe-area-inset-bottom,0px))] flex items-center justify-around shadow-[0_-4px_20px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_25px_rgba(0,0,0,0.5)]">
         <button
           type="button"
           onClick={() => setActiveTab('arena')}

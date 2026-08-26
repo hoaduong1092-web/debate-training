@@ -510,7 +510,7 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
       setInputText(prefilledDraft.trim());
       setInputMode('text');
     }
-    if (prefilledTopic || prefilledDraft || finalDraft) {
+    if (prefilledTopic || prefilledDraft) {
       onClearPrefill?.();
     }
   }, [prefilledTopic, prefilledStance, prefilledDraft, finalDraft, onClearPrefill]);

@@ -593,8 +593,7 @@ export async function handleDebateMessage(req: Request, res: Response) {
               systemPrompt,
               userPrompt,
               temperature: 0.7,
-              max_tokens: 1500,
-              response_format: { type: 'json_object' },
+              max_tokens: 3000,
             });
 
             const parsedJson = adaptLogicCoachPayload(completion.content);
